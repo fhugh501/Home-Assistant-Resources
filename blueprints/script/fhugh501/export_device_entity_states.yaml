@@ -1,0 +1,288 @@
+blueprint:
+  name: Export Device & Entity States
+  description: >-
+    Export detailed Home Assistant state information for one or more devices and/or
+    individual entities into a copyable persistent notification. Includes entity IDs,
+    friendly names, current states, availability, common selectable options/modes,
+    device/state classes, units, and all current attributes. Duplicate entities are
+    automatically suppressed when they are selected directly and also belong to a
+    selected device.
+  domain: script
+  author: fhugh501
+  input:
+    selected_devices:
+      name: Devices
+      description: Select one or more devices to include in the export. Optional.
+      default: []
+      selector:
+        device:
+          multiple: true
+
+    selected_entities:
+      name: Additional entities
+      description: >-
+        Select one or more individual entities to include. Entities already included
+        through a selected device are automatically skipped. Optional.
+      default: []
+      selector:
+        entity:
+          multiple: true
+
+mode: restart
+icon: mdi:devices
+
+variables:
+  devices: !input selected_devices
+  manual_entities: !input selected_entities
+
+sequence:
+  - variables:
+      export_text: >-
+        {% set ns = namespace(lines=[], exported_entities=[]) %}
+
+        {% set ns.lines = ns.lines + [
+          'HOME ASSISTANT ENTITY EXPORT',
+          '==================================================',
+          'Selected devices: ' ~ (devices | count),
+          'Additional entities: ' ~ (manual_entities | count),
+          '',
+          ''
+        ] %}
+
+        {% for selected_device in devices %}
+          {% set device_label = device_name(selected_device) | default('Unknown Device', true) %}
+          {% set registered_entities = device_entities(selected_device) | sort | list %}
+          {% set ids = device_entities(selected_device) %}
+          {% set enabled_entities = states
+            | selectattr('entity_id', 'in', ids)
+            | map(attribute='entity_id')
+            | sort
+            | list %}
+
+          {% set ns.lines = ns.lines + [
+            'DEVICE',
+            '==================================================',
+            'Name: ' ~ device_label,
+            'Device ID: ' ~ selected_device,
+            'Enabled entities: ' ~ (enabled_entities | count),
+            'Total registered entities: ' ~ (registered_entities | count),
+            '',
+            'ENTITIES',
+            '==================================================',
+            ''
+          ] %}
+
+          {% if enabled_entities | count > 0 %}
+            {% for entity_id in enabled_entities %}
+              {% set ns.exported_entities = ns.exported_entities + [entity_id] %}
+              {% set domain = entity_id.split('.')[0] %}
+              {% set entity_state = states[entity_id] %}
+
+              {% set ns.lines = ns.lines + [
+                'Friendly name: ' ~ (state_attr(entity_id, 'friendly_name') | default(entity_id, true)),
+                'Entity ID: ' ~ entity_id,
+                'Domain: ' ~ domain,
+                'Current state: ' ~ states(entity_id),
+                'Available: ' ~ (has_value(entity_id) | string),
+                ''
+              ] %}
+
+              {% set event_types = state_attr(entity_id, 'event_types') %}
+              {% set options = state_attr(entity_id, 'options') %}
+              {% set hvac_modes = state_attr(entity_id, 'hvac_modes') %}
+              {% set fan_modes = state_attr(entity_id, 'fan_modes') %}
+              {% set preset_modes = state_attr(entity_id, 'preset_modes') %}
+              {% set swing_modes = state_attr(entity_id, 'swing_modes') %}
+              {% set effects = state_attr(entity_id, 'effect_list') %}
+              {% set sources = state_attr(entity_id, 'source_list') %}
+              {% set sound_modes = state_attr(entity_id, 'sound_mode_list') %}
+
+              {% if event_types %}
+                {% set ns.lines = ns.lines + ['Available event types: ' ~ (event_types | join(', '))] %}
+              {% endif %}
+              {% if options %}
+                {% set ns.lines = ns.lines + ['Available options: ' ~ (options | join(', '))] %}
+              {% endif %}
+              {% if hvac_modes %}
+                {% set ns.lines = ns.lines + ['Available HVAC modes: ' ~ (hvac_modes | join(', '))] %}
+              {% endif %}
+              {% if fan_modes %}
+                {% set ns.lines = ns.lines + ['Available fan modes: ' ~ (fan_modes | join(', '))] %}
+              {% endif %}
+              {% if preset_modes %}
+                {% set ns.lines = ns.lines + ['Available preset modes: ' ~ (preset_modes | join(', '))] %}
+              {% endif %}
+              {% if swing_modes %}
+                {% set ns.lines = ns.lines + ['Available swing modes: ' ~ (swing_modes | join(', '))] %}
+              {% endif %}
+              {% if effects %}
+                {% set ns.lines = ns.lines + ['Available effects: ' ~ (effects | join(', '))] %}
+              {% endif %}
+              {% if sources %}
+                {% set ns.lines = ns.lines + ['Available sources: ' ~ (sources | join(', '))] %}
+              {% endif %}
+              {% if sound_modes %}
+                {% set ns.lines = ns.lines + ['Available sound modes: ' ~ (sound_modes | join(', '))] %}
+              {% endif %}
+
+              {% if domain in ['switch', 'light', 'input_boolean'] %}
+                {% set ns.lines = ns.lines + ['', 'Standard states: on, off'] %}
+              {% elif domain == 'binary_sensor' %}
+                {% set ns.lines = ns.lines + ['', 'Standard states: on, off'] %}
+              {% elif domain == 'lock' %}
+                {% set ns.lines = ns.lines + ['', 'Standard states: locked, unlocked, locking, unlocking, jammed'] %}
+              {% elif domain == 'cover' %}
+                {% set ns.lines = ns.lines + ['', 'Standard states: open, closed, opening, closing'] %}
+              {% elif domain == 'vacuum' %}
+                {% set ns.lines = ns.lines + ['', 'Standard states: cleaning, docked, returning, paused, idle, error'] %}
+              {% elif domain == 'button' %}
+                {% set ns.lines = ns.lines + ['', 'Standard states: Stateless action entity'] %}
+              {% elif domain == 'event' %}
+                {% set ns.lines = ns.lines + ['', 'State meaning: Timestamp of the most recent event'] %}
+              {% endif %}
+
+              {% set ns.lines = ns.lines + [
+                '',
+                'Last event type: ' ~ (state_attr(entity_id, 'event_type') | default('None', true)),
+                'Unit: ' ~ (state_attr(entity_id, 'unit_of_measurement') | default('None', true)),
+                'Device class: ' ~ (state_attr(entity_id, 'device_class') | default('None', true)),
+                'State class: ' ~ (state_attr(entity_id, 'state_class') | default('None', true)),
+                '',
+                'Attributes:'
+              ] %}
+
+              {% if entity_state %}
+                {% for attribute, value in entity_state.attributes.items() %}
+                  {% set ns.lines = ns.lines + ['  ' ~ attribute ~ ': ' ~ (value | string)] %}
+                {% endfor %}
+              {% else %}
+                {% set ns.lines = ns.lines + ['  No attributes available'] %}
+              {% endif %}
+
+              {% set ns.lines = ns.lines + ['', '--------------------------------------------------', ''] %}
+            {% endfor %}
+          {% else %}
+            {% set ns.lines = ns.lines + ['No enabled entities were found for this device.', ''] %}
+          {% endif %}
+
+          {% set ns.lines = ns.lines + ['', '##################################################', '', ''] %}
+        {% endfor %}
+
+        {% set standalone = manual_entities | reject('in', ns.exported_entities) | list %}
+
+        {% if standalone | count > 0 %}
+          {% set ns.lines = ns.lines + [
+            'INDIVIDUALLY SELECTED ENTITIES',
+            '==================================================',
+            ''
+          ] %}
+
+          {% for entity_id in standalone %}
+            {% set domain = entity_id.split('.')[0] %}
+            {% set entity_state = states[entity_id] %}
+
+            {% set ns.lines = ns.lines + [
+              'Friendly name: ' ~ (state_attr(entity_id, 'friendly_name') | default(entity_id, true)),
+              'Entity ID: ' ~ entity_id,
+              'Domain: ' ~ domain,
+              'Current state: ' ~ states(entity_id),
+              'Available: ' ~ (has_value(entity_id) | string),
+              ''
+            ] %}
+
+            {% set event_types = state_attr(entity_id, 'event_types') %}
+            {% set options = state_attr(entity_id, 'options') %}
+            {% set hvac_modes = state_attr(entity_id, 'hvac_modes') %}
+            {% set fan_modes = state_attr(entity_id, 'fan_modes') %}
+            {% set preset_modes = state_attr(entity_id, 'preset_modes') %}
+            {% set swing_modes = state_attr(entity_id, 'swing_modes') %}
+            {% set effects = state_attr(entity_id, 'effect_list') %}
+            {% set sources = state_attr(entity_id, 'source_list') %}
+            {% set sound_modes = state_attr(entity_id, 'sound_mode_list') %}
+
+            {% if event_types %}
+              {% set ns.lines = ns.lines + ['Available event types: ' ~ (event_types | join(', '))] %}
+            {% endif %}
+            {% if options %}
+              {% set ns.lines = ns.lines + ['Available options: ' ~ (options | join(', '))] %}
+            {% endif %}
+            {% if hvac_modes %}
+              {% set ns.lines = ns.lines + ['Available HVAC modes: ' ~ (hvac_modes | join(', '))] %}
+            {% endif %}
+            {% if fan_modes %}
+              {% set ns.lines = ns.lines + ['Available fan modes: ' ~ (fan_modes | join(', '))] %}
+            {% endif %}
+            {% if preset_modes %}
+              {% set ns.lines = ns.lines + ['Available preset modes: ' ~ (preset_modes | join(', '))] %}
+            {% endif %}
+            {% if swing_modes %}
+              {% set ns.lines = ns.lines + ['Available swing modes: ' ~ (swing_modes | join(', '))] %}
+            {% endif %}
+            {% if effects %}
+              {% set ns.lines = ns.lines + ['Available effects: ' ~ (effects | join(', '))] %}
+            {% endif %}
+            {% if sources %}
+              {% set ns.lines = ns.lines + ['Available sources: ' ~ (sources | join(', '))] %}
+            {% endif %}
+            {% if sound_modes %}
+              {% set ns.lines = ns.lines + ['Available sound modes: ' ~ (sound_modes | join(', '))] %}
+            {% endif %}
+
+            {% if domain in ['switch', 'light', 'input_boolean'] %}
+              {% set ns.lines = ns.lines + ['', 'Standard states: on, off'] %}
+            {% elif domain == 'binary_sensor' %}
+              {% set ns.lines = ns.lines + ['', 'Standard states: on, off'] %}
+            {% elif domain == 'lock' %}
+              {% set ns.lines = ns.lines + ['', 'Standard states: locked, unlocked, locking, unlocking, jammed'] %}
+            {% elif domain == 'cover' %}
+              {% set ns.lines = ns.lines + ['', 'Standard states: open, closed, opening, closing'] %}
+            {% elif domain == 'vacuum' %}
+              {% set ns.lines = ns.lines + ['', 'Standard states: cleaning, docked, returning, paused, idle, error'] %}
+            {% elif domain == 'button' %}
+              {% set ns.lines = ns.lines + ['', 'Standard states: Stateless action entity'] %}
+            {% elif domain == 'event' %}
+              {% set ns.lines = ns.lines + ['', 'State meaning: Timestamp of the most recent event'] %}
+            {% endif %}
+
+            {% set ns.lines = ns.lines + [
+              '',
+              'Last event type: ' ~ (state_attr(entity_id, 'event_type') | default('None', true)),
+              'Unit: ' ~ (state_attr(entity_id, 'unit_of_measurement') | default('None', true)),
+              'Device class: ' ~ (state_attr(entity_id, 'device_class') | default('None', true)),
+              'State class: ' ~ (state_attr(entity_id, 'state_class') | default('None', true)),
+              '',
+              'Attributes:'
+            ] %}
+
+            {% if entity_state %}
+              {% for attribute, value in entity_state.attributes.items() %}
+                {% set ns.lines = ns.lines + ['  ' ~ attribute ~ ': ' ~ (value | string)] %}
+              {% endfor %}
+            {% else %}
+              {% set ns.lines = ns.lines + ['  No attributes available'] %}
+            {% endif %}
+
+            {% set ns.lines = ns.lines + ['', '--------------------------------------------------', ''] %}
+          {% endfor %}
+        {% endif %}
+
+        {{ ns.lines | join('\n') }}
+
+  - action: persistent_notification.create
+    data:
+      notification_id: device_entity_export
+      title: >-
+        Entity Export — {{ devices | count }} Device{% if devices | count != 1 %}s{% endif %},
+        {{ manual_entities | count }} Additional Entit{% if manual_entities | count == 1 %}y{% else %}ies{% endif %}
+      message: |-
+        ## Home Assistant Export
+
+        **Devices selected:** {{ devices | count }}
+
+        **Additional entities selected:** {{ manual_entities | count }}
+
+        Copy the contents of the block below:
+
+        ```text
+        {{ export_text }}
+        ```
