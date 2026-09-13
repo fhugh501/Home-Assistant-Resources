@@ -30,6 +30,14 @@ A fixed-size **Home Assistant dashboard template** designed for an 800×480 TRMN
 
 > Dashboard templates are not native Home Assistant automation/script blueprints, so this resource is installed by copying the YAML into a dedicated dashboard and replacing the documented entity placeholders.
 
+### Hardware & 3D Printing
+
+#### TRMNL 7.5" OG DIY Kit Wall Mount
+
+A community-designed two-part 3D-printable wall mount for the **TRMNL 7.5" OG DIY Kit**. The design uses four M3 screws and is a useful starting point for remixes, including adding recessed magnets for refrigerator mounting.
+
+[View and download on Printables](https://www.printables.com/model/1385847-trmnl-diy-kit-wall-mount)
+
 ### Blueprints
 
 #### Export Device & Entity States
