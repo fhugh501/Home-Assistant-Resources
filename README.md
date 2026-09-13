@@ -99,4 +99,10 @@ A **Dominion Technology Consulting** project
 
 ## License
 
-Licensing information will be provided for resources in this repository. Until an explicit license is added, the presence of source code in this public repository should not be interpreted as granting rights beyond those provided by GitHub's terms of service.
+Unless otherwise noted, the resources and source code published in this repository are licensed under the **MIT License**.
+
+Copyright (c) 2026 Dominion Technology Consulting.
+
+See [LICENSE](LICENSE) for the full license text.
+
+This license applies to material published in this public repository. Separate Dominion Smart Home Systems products, premium resources, services, or private repositories may be offered under different terms.
