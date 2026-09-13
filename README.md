@@ -8,6 +8,28 @@ This repository is a growing collection of reusable Home Assistant resources dev
 
 ## Available Resources
 
+### Dashboards
+
+#### TRMNL 800×480 E-Ink Home Status Dashboard
+
+A fixed-size **Home Assistant dashboard template** designed for an 800×480 TRMNL e-ink display and screenshot-based delivery through TRMNL HA.
+
+**Highlights include:**
+
+- Action-focused Notification Center with larger alert icons
+- Prominent smoke, CO, and security alarm handling
+- Door, vehicle, laundry, and plant-moisture notifications
+- Current weather and local 60-minute rain probability
+- Static OSM/RainViewer radar optimized for e-ink capture
+- Compact security, indoor climate, and outdoor AQI panels
+- Kiosk Mode support for a clean header-free screenshot
+- Fixed 800×480 layout with refresh date/time footer
+- Reusable `replace_*` entity placeholders instead of installation-specific entity IDs
+
+[View full documentation](dashboards/trmnl-eink-home-status/README.md) · [View dashboard template YAML](dashboards/trmnl-eink-home-status/dashboard-template.yaml)
+
+> Dashboard templates are not native Home Assistant automation/script blueprints, so this resource is installed by copying the YAML into a dedicated dashboard and replacing the documented entity placeholders.
+
 ### Blueprints
 
 #### Export Device & Entity States
