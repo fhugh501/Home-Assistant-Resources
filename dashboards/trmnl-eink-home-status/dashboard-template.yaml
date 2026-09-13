@@ -1,0 +1,1023 @@
+# TRMNL 800×480 E-Ink Home Status Dashboard
+# Reusable Home Assistant dashboard template.
+# Replace every replace_* entity ID before use.
+# Requires: button-card, layout-card, Kiosk Mode, weather-radar-card.
+
+title: TRMNL Status
+
+kiosk_mode:
+  hide_header: true
+  hide_sidebar: true
+
+button_card_templates:
+  trmnl_panel:
+    show_icon: false
+    show_name: false
+    show_state: false
+    tap_action:
+      action: none
+    hold_action:
+      action: none
+    double_tap_action:
+      action: none
+    styles:
+      card:
+        - background: white
+        - box-shadow: none
+        - border-radius: 0
+        - border: none
+        - padding: 8px 10px
+        - height: 100%
+        - overflow: hidden
+      grid:
+        - grid-template-areas: '"body"'
+        - grid-template-columns: 1fr
+        - grid-template-rows: 1fr
+      custom_fields:
+        body:
+          - text-align: left
+          - align-self: stretch
+          - justify-self: stretch
+          - overflow: hidden
+          - white-space: normal
+
+views:
+  - title: Status
+    path: "0"
+    type: custom:grid-layout
+    badges: []
+
+    layout:
+      grid-template-columns: "2.7fr 1.9fr 2.7fr"
+      grid-template-rows: "292px 140px 16px"
+      grid-template-areas: |
+        "notify today radar"
+        "system indoor outside"
+        "footer footer footer"
+      grid-gap: 8px
+      padding: 8px
+      margin: 0
+
+    cards:
+
+      # ==========================================================
+      # NOTIFICATIONS
+      # ==========================================================
+
+      - type: custom:button-card
+        template: trmnl_panel
+        view_layout:
+          grid-area: notify
+
+        triggers_update:
+          - alarm_control_panel.replace_security_system
+          - binary_sensor.replace_primary_door_contact
+          - binary_sensor.replace_secondary_door_contact
+          - lock.replace_primary_door_lock
+          - lock.replace_vehicle_lock
+          - binary_sensor.replace_vehicle_engine
+          - binary_sensor.replace_vehicle_low_fuel
+          - binary_sensor.replace_vehicle_tire_pressure_all
+          - binary_sensor.replace_vehicle_tire_pressure_front_left
+          - binary_sensor.replace_vehicle_tire_pressure_front_right
+          - binary_sensor.replace_vehicle_tire_pressure_rear_left
+          - binary_sensor.replace_vehicle_tire_pressure_rear_right
+          - sensor.replace_washer_cycle_status
+          - input_select.replace_dryer_cycle_status
+          - sensor.replace_plant_moisture_minimum
+          - binary_sensor.replace_smoke_detected
+          - binary_sensor.replace_co_detected
+          - binary_sensor.replace_detector_replace_battery_now
+          - binary_sensor.replace_detector_replace_battery_soon
+          - binary_sensor.replace_detector_tamper
+          - sensor.replace_detector_node_status
+
+        custom_fields:
+          body: |
+            [[[
+              const bad = (v) =>
+                v === undefined ||
+                v === null ||
+                ['unknown', 'unavailable', 'none', 'null', '']
+                  .includes(String(v).toLowerCase());
+
+              const st = (id) => states[id]?.state;
+              const isOn = (id) => st(id) === 'on';
+
+              const esc = (v) =>
+                String(v ?? '')
+                  .replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;')
+                  .replace(/'/g, '&#39;');
+
+              const icon = (name, size = 16) => `
+                <ha-icon
+                  icon="mdi:${name}"
+                  style="
+                    width:${size}px;
+                    height:${size}px;
+                    --mdc-icon-size:${size}px;
+                    flex-shrink:0;
+                  "
+                ></ha-icon>
+              `;
+
+              const alerts = [];
+              const add = (mdi, text, urgent = false) => {
+                alerts.push({ mdi, text, urgent });
+              };
+
+              // Life safety
+              if (isOn('binary_sensor.replace_smoke_detected')) {
+                add('fire-alert', 'Smoke / fire alarm', true);
+              }
+
+              if (isOn('binary_sensor.replace_co_detected')) {
+                add('molecule-co', 'Carbon monoxide alarm', true);
+              }
+
+              if (st('alarm_control_panel.replace_security_system') === 'triggered') {
+                add('shield-alert', 'Security alarm triggered', true);
+              }
+
+              // Smoke / CO detector health
+              const nodeStatus = st('sensor.replace_detector_node_status');
+
+              if (
+                bad(nodeStatus) ||
+                ['dead', 'offline', 'unavailable', 'unknown']
+                  .includes(String(nodeStatus).toLowerCase())
+              ) {
+                add(
+                  'access-point-network-off',
+                  'Smoke/CO detector communication problem'
+                );
+              }
+
+              // "asleep" is treated as normal for battery-powered Z-Wave devices.
+              if (isOn('binary_sensor.replace_detector_replace_battery_now')) {
+                add('battery-alert', 'Smoke/CO detector replace battery');
+              } else if (isOn('binary_sensor.replace_detector_replace_battery_soon')) {
+                add('battery-low', 'Smoke/CO detector battery low');
+              }
+
+              if (isOn('binary_sensor.replace_detector_tamper')) {
+                add('shield-alert-outline', 'Smoke/CO detector tamper');
+              }
+
+              // Open doors
+              const openDoors = [];
+
+              if (isOn('binary_sensor.replace_primary_door_contact')) {
+                openDoors.push('Front door');
+              }
+
+              if (isOn('binary_sensor.replace_secondary_door_contact')) {
+                openDoors.push('Secondary door');
+              }
+
+              if (openDoors.length) {
+                add('door-open', `${openDoors.join(' + ')} open`);
+              }
+
+              // Jammed locks
+              const jammedLocks = [];
+
+              if (st('lock.replace_primary_door_lock') === 'jammed') {
+                jammedLocks.push('Front');
+              }
+
+              if (st('lock.replace_vehicle_lock') === 'jammed') {
+                jammedLocks.push('Vehicle');
+              }
+
+              if (jammedLocks.length) {
+                add('lock-alert', `Lock jam: ${jammedLocks.join(' + ')}`);
+              }
+
+              // Vehicle
+              if (isOn('binary_sensor.replace_vehicle_engine')) {
+                add('engine', 'Vehicle engine running');
+              }
+
+              if (isOn('binary_sensor.replace_vehicle_low_fuel')) {
+                add('gas-station', 'Vehicle low fuel');
+              }
+
+              const tireList = [];
+
+              if (isOn('binary_sensor.replace_vehicle_tire_pressure_front_left')) {
+                tireList.push('Front L');
+              }
+
+              if (isOn('binary_sensor.replace_vehicle_tire_pressure_front_right')) {
+                tireList.push('Front R');
+              }
+
+              if (isOn('binary_sensor.replace_vehicle_tire_pressure_rear_left')) {
+                tireList.push('Rear L');
+              }
+
+              if (isOn('binary_sensor.replace_vehicle_tire_pressure_rear_right')) {
+                tireList.push('Rear R');
+              }
+
+              if (
+                isOn('binary_sensor.replace_vehicle_tire_pressure_all') ||
+                tireList.length
+              ) {
+                add(
+                  'car-tire-alert',
+                  tireList.length
+                    ? `Tire pressure: ${tireList.join(' + ')}`
+                    : 'Tire pressure warning'
+                );
+              }
+
+              // Laundry
+              const washer = String(
+                st('sensor.replace_washer_cycle_status') || ''
+              ).toLowerCase();
+
+              const dryer = String(
+                st('input_select.replace_dryer_cycle_status') || ''
+              ).toLowerCase();
+
+              if (washer === 'running') {
+                add('washing-machine', 'Washer running');
+              }
+
+              if (washer === 'complete') {
+                add('washing-machine', 'Washer complete');
+              }
+
+              if (dryer === 'running') {
+                add('tumble-dryer', 'Dryer running');
+              }
+
+              if (dryer === 'complete') {
+                add('tumble-dryer', 'Dryer complete');
+              }
+
+              // Plants
+              const plantState = Number(
+                st('sensor.replace_plant_moisture_minimum')
+              );
+
+              if (!Number.isNaN(plantState) && plantState < 25) {
+                add(
+                  'sprout',
+                  `Plants need watering (${Math.round(plantState)}%)`
+                );
+              }
+
+              // Notification visual layout
+              const count = alerts.length;
+              let rowHeight;
+              let textSize;
+              let iconSize;
+              let rowGap;
+
+              if (count <= 4) {
+                rowHeight = 58;
+                textSize = 18;
+                iconSize = 27;
+                rowGap = 5;
+              } else if (count <= 6) {
+                rowHeight = 39;
+                textSize = 16;
+                iconSize = 23;
+                rowGap = 4;
+              } else if (count <= 9) {
+                rowHeight = 27;
+                textSize = 14;
+                iconSize = 19;
+                rowGap = 3;
+              } else {
+                rowHeight = 22;
+                textSize = 12;
+                iconSize = 16;
+                rowGap = 2;
+              }
+
+              const header = `
+                <div
+                  style="
+                    display:flex;
+                    justify-content:space-between;
+                    align-items:center;
+                    height:22px;
+                    margin-bottom:10px;
+                  "
+                >
+                  <div
+                    style="
+                      font-size:13px;
+                      font-weight:700;
+                      letter-spacing:0.08em;
+                      text-transform:uppercase;
+                    "
+                  >
+                    Notifications
+                  </div>
+
+                  ${
+                    count
+                      ? `
+                        <div
+                          style="
+                            font-size:10px;
+                            font-weight:700;
+                            letter-spacing:0.04em;
+                            text-transform:uppercase;
+                            border:1px solid #111;
+                            border-radius:10px;
+                            padding:2px 7px;
+                            white-space:nowrap;
+                          "
+                        >
+                          ${count} active
+                        </div>
+                      `
+                      : ''
+                  }
+                </div>
+              `;
+
+              if (!count) {
+                return (
+                  header +
+                  `
+                  <div
+                    style="
+                      height:225px;
+                      display:flex;
+                      align-items:center;
+                    "
+                  >
+                    <div
+                      style="
+                        display:grid;
+                        grid-template-columns:44px 1fr;
+                        align-items:center;
+                        column-gap:10px;
+                      "
+                    >
+                      <div
+                        style="
+                          display:flex;
+                          align-items:center;
+                          justify-content:center;
+                        "
+                      >
+                        ${icon('check-circle-outline', 32)}
+                      </div>
+
+                      <div>
+                        <div
+                          style="
+                            font-size:22px;
+                            line-height:1.1;
+                            font-weight:700;
+                            margin-bottom:4px;
+                          "
+                        >
+                          All clear
+                        </div>
+
+                        <div
+                          style="
+                            font-size:13px;
+                            line-height:1.2;
+                            color:#444;
+                          "
+                        >
+                          Nothing needs your attention.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  `
+                );
+              }
+
+              const rows = alerts.map((a) => {
+                const background = a.urgent ? '#111' : 'transparent';
+                const color = a.urgent ? '#fff' : '#111';
+
+                return `
+                  <div
+                    style="
+                      display:grid;
+                      grid-template-columns:${iconSize + 10}px minmax(0, 1fr);
+                      align-items:center;
+                      height:${rowHeight}px;
+                      min-height:${rowHeight}px;
+                      column-gap:8px;
+                      padding:${a.urgent ? '0 8px' : '0 2px'};
+                      background:${background};
+                      color:${color};
+                      border-radius:${a.urgent ? '3px' : '0'};
+                      overflow:hidden;
+                    "
+                  >
+                    <div
+                      style="
+                        width:${iconSize + 10}px;
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
+                      "
+                    >
+                      ${icon(a.mdi, iconSize)}
+                    </div>
+
+                    <div
+                      style="
+                        min-width:0;
+                        font-size:${textSize}px;
+                        line-height:1.1;
+                        font-weight:${a.urgent ? '700' : '600'};
+                        text-align:left;
+                        white-space:normal;
+                        overflow-wrap:anywhere;
+                      "
+                    >
+                      ${esc(a.text)}
+                    </div>
+                  </div>
+                `;
+              }).join('');
+
+              return (
+                header +
+                `
+                <div
+                  style="
+                    display:flex;
+                    flex-direction:column;
+                    gap:${rowGap}px;
+                    width:100%;
+                  "
+                >
+                  ${rows}
+                </div>
+                `
+              );
+            ]]]
+
+      # ==========================================================
+      # TODAY / WEATHER SUMMARY
+      # ==========================================================
+
+      - type: custom:button-card
+        template: trmnl_panel
+        view_layout:
+          grid-area: today
+        triggers_update:
+          - weather.replace_weather
+          - sensor.replace_local_rain_probability_60m
+        custom_fields:
+          body: |
+            [[[
+              const bad = (v) =>
+                v === undefined ||
+                v === null ||
+                ['unknown', 'unavailable', 'none', 'null', '']
+                  .includes(String(v).toLowerCase());
+
+              const state = states['weather.replace_weather']?.state;
+              const attr = states['weather.replace_weather']?.attributes || {};
+              const rain = states['sensor.replace_local_rain_probability_60m']?.state;
+
+              const esc = (v) =>
+                String(v ?? '')
+                  .replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;')
+                  .replace(/'/g, '&#39;');
+
+              const title = (v) => {
+                if (bad(v)) return 'Unavailable';
+                return String(v)
+                  .replace(/[_-]/g, ' ')
+                  .replace(/\b\w/g, (c) => c.toUpperCase());
+              };
+
+              const temp = bad(attr.temperature)
+                ? '—'
+                : Math.round(Number(attr.temperature));
+
+              const feels = bad(attr.apparent_temperature)
+                ? '—'
+                : Math.round(Number(attr.apparent_temperature));
+
+              const humidity = bad(attr.humidity)
+                ? '—'
+                : Math.round(Number(attr.humidity));
+
+              const wind = bad(attr.wind_speed)
+                ? '—'
+                : Math.round(Number(attr.wind_speed));
+
+              const rainPct = bad(rain)
+                ? '—'
+                : Math.round(Number(rain));
+
+              const d = new Date();
+              const timeZone = hass.config?.time_zone || undefined;
+
+              const dateText = d.toLocaleDateString('en-US', {
+                timeZone,
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric'
+              });
+
+              return `
+                <div
+                  style="
+                    font-size:13px;
+                    font-weight:700;
+                    letter-spacing:0.08em;
+                    text-transform:uppercase;
+                    margin-bottom:4px;
+                  "
+                >
+                  Today
+                </div>
+
+                <div style="font-size:11px;color:#555;margin-bottom:6px;">
+                  ${esc(dateText)}
+                </div>
+
+                <div
+                  style="
+                    font-size:52px;
+                    line-height:0.95;
+                    font-weight:700;
+                    margin-bottom:4px;
+                  "
+                >
+                  ${temp}°
+                </div>
+
+                <div
+                  style="
+                    font-size:18px;
+                    font-weight:600;
+                    line-height:1.1;
+                    margin-bottom:4px;
+                  "
+                >
+                  ${esc(title(state))}
+                </div>
+
+                <div style="font-size:13px;color:#444;margin-bottom:10px;">
+                  Feels like <strong>${feels}°</strong>
+                </div>
+
+                <div
+                  style="
+                    border-top:1px solid #111;
+                    padding-top:8px;
+                    margin-top:4px;
+                  "
+                >
+                  <div style="font-size:28px;line-height:1;font-weight:700;">
+                    ${rainPct}%
+                  </div>
+
+                  <div
+                    style="
+                      font-size:10px;
+                      text-transform:uppercase;
+                      letter-spacing:0.04em;
+                      margin-top:2px;
+                      margin-bottom:8px;
+                    "
+                  >
+                    Rain next 60 min
+                  </div>
+
+                  <div
+                    style="
+                      display:flex;
+                      flex-direction:column;
+                      gap:3px;
+                      font-size:12px;
+                      line-height:1.15;
+                    "
+                  >
+                    <div>Humidity <strong>${humidity}%</strong></div>
+                    <div>Wind <strong>${wind} mph</strong></div>
+                  </div>
+                </div>
+              `;
+            ]]]
+
+      # ==========================================================
+      # STATIC RADAR
+      # ==========================================================
+
+      - type: custom:weather-radar-card
+        view_layout:
+          grid-area: radar
+        static_map: true
+        show_range: true
+        show_playback: false
+        show_zoom: false
+        square_map: false
+        show_recenter: false
+        extra_labels: false
+        show_scale: true
+        show_marker: true
+        map_style: OSM
+        data_source: RainViewer
+        markers:
+          - entity: zone.home
+        past_minutes: 0
+        smooth_animation: false
+        grid_options:
+          rows: auto
+        show_progress_bar: false
+        show_loading_spinner: false
+        show_color_bar: true
+        disable_scroll: false
+        double_tap_action: none
+        animated_transitions: false
+        show_alerts: true
+        alerts_min_severity: Severe
+        show_snow: false
+        zoom_level: 9
+
+      # ==========================================================
+      # SYSTEM / SECURITY
+      # ==========================================================
+
+      - type: custom:button-card
+        template: trmnl_panel
+        view_layout:
+          grid-area: system
+        triggers_update:
+          - input_select.replace_system_mode
+          - alarm_control_panel.replace_security_system
+          - lock.replace_primary_door_lock
+          - lock.replace_vehicle_lock
+          - sensor.replace_detector_node_status
+          - sensor.replace_detector_battery_level
+        custom_fields:
+          body: |
+            [[[
+              const st = (id) => states[id]?.state;
+
+              const title = (v) => {
+                if (
+                  v === undefined ||
+                  v === null ||
+                  ['unknown', 'unavailable', 'none', 'null', '']
+                    .includes(String(v).toLowerCase())
+                ) {
+                  return 'Unavailable';
+                }
+
+                return String(v)
+                  .replace(/[_-]/g, ' ')
+                  .replace(/\b\w/g, (c) => c.toUpperCase());
+              };
+
+              const battery = states['sensor.replace_detector_battery_level']?.state;
+
+              const batteryText =
+                battery === undefined ||
+                battery === null ||
+                battery === 'unknown' ||
+                battery === 'unavailable'
+                  ? '—'
+                  : `${Math.round(Number(battery))}%`;
+
+              const row = (label, value) => `
+                <div
+                  style="
+                    display:flex;
+                    justify-content:space-between;
+                    gap:8px;
+                    font-size:13px;
+                    line-height:1.2;
+                    margin-bottom:4px;
+                  "
+                >
+                  <span style="color:#444;">${label}</span>
+                  <strong style="text-align:right;">${value}</strong>
+                </div>
+              `;
+
+              return `
+                <div
+                  style="
+                    font-size:12px;
+                    font-weight:700;
+                    letter-spacing:0.08em;
+                    text-transform:uppercase;
+                    margin-bottom:8px;
+                    border-top:1px solid #111;
+                    padding-top:4px;
+                  "
+                >
+                  Security
+                </div>
+
+                ${row('Mode', title(st('input_select.replace_system_mode')))}
+                ${row('Alarm', title(st('alarm_control_panel.replace_security_system')))}
+                ${row('Front door', title(st('lock.replace_primary_door_lock')))}
+                ${row('Vehicle', title(st('lock.replace_vehicle_lock')))}
+                ${row(
+                  'Smoke/CO',
+                  `${title(st('sensor.replace_detector_node_status'))} · ${batteryText}`
+                )}
+              `;
+            ]]]
+
+      # ==========================================================
+      # INDOOR
+      # ==========================================================
+
+      - type: custom:button-card
+        template: trmnl_panel
+        view_layout:
+          grid-area: indoor
+        triggers_update:
+          - sensor.replace_indoor_temperature
+          - sensor.replace_indoor_humidity
+          - climate.replace_thermostat
+          - sensor.replace_indoor_pm25_average
+        custom_fields:
+          body: |
+            [[[
+              const bad = (v) =>
+                v === undefined ||
+                v === null ||
+                ['unknown', 'unavailable', 'none', 'null', '']
+                  .includes(String(v).toLowerCase());
+
+              const tempRaw = states['sensor.replace_indoor_temperature']?.state;
+              const humRaw = states['sensor.replace_indoor_humidity']?.state;
+              const pmRaw = states['sensor.replace_indoor_pm25_average']?.state;
+              const climateState = states['climate.replace_thermostat']?.state;
+              const climateAttr = states['climate.replace_thermostat']?.attributes || {};
+
+              const temp = bad(tempRaw) ? '—' : Number(tempRaw).toFixed(1);
+              const hum = bad(humRaw) ? '—' : Math.round(Number(humRaw));
+              const pm = bad(pmRaw) ? '—' : Number(pmRaw).toFixed(1);
+
+              const pretty = (v) =>
+                bad(v)
+                  ? 'Unavailable'
+                  : String(v)
+                      .replace(/[_-]/g, ' ')
+                      .replace(/\b\w/g, (c) => c.toUpperCase());
+
+              const hvacAction = pretty(climateAttr.hvac_action);
+              const hvacMode = pretty(climateState);
+
+              let target = '—';
+
+              if (!bad(climateAttr.temperature)) {
+                target = `${Math.round(Number(climateAttr.temperature))}°`;
+              }
+
+              const row = (label, value) => `
+                <div
+                  style="
+                    display:flex;
+                    justify-content:space-between;
+                    gap:8px;
+                    font-size:13px;
+                    line-height:1.2;
+                    margin-bottom:4px;
+                  "
+                >
+                  <span style="color:#444;">${label}</span>
+                  <strong style="text-align:right;">${value}</strong>
+                </div>
+              `;
+
+              return `
+                <div
+                  style="
+                    font-size:12px;
+                    font-weight:700;
+                    letter-spacing:0.08em;
+                    text-transform:uppercase;
+                    margin-bottom:8px;
+                    border-top:1px solid #111;
+                    padding-top:4px;
+                  "
+                >
+                  Indoor
+                </div>
+
+                <div
+                  style="
+                    display:flex;
+                    justify-content:space-between;
+                    align-items:flex-end;
+                    margin-bottom:8px;
+                  "
+                >
+                  <div style="font-size:28px;font-weight:700;line-height:1;">
+                    ${temp}°
+                  </div>
+                  <div style="font-size:12px;color:#444;">
+                    ${hum}% humidity
+                  </div>
+                </div>
+
+                ${row('Set point', target)}
+                ${row('HVAC', `${hvacMode} · ${hvacAction}`)}
+                ${row('PM2.5', `${pm} μg/m³`)}
+              `;
+            ]]]
+
+      # ==========================================================
+      # OUTSIDE AIR
+      # ==========================================================
+
+      - type: custom:button-card
+        template: trmnl_panel
+        view_layout:
+          grid-area: outside
+        triggers_update:
+          - sensor.replace_outdoor_aqi
+          - sensor.replace_outdoor_dominant_pollutant
+          - sensor.replace_outdoor_pm25
+          - sensor.replace_outdoor_pm10
+          - sensor.replace_outdoor_temperature
+          - sensor.replace_outdoor_humidity
+        custom_fields:
+          body: |
+            [[[
+              const st = (id) => states[id]?.state;
+
+              const bad = (v) =>
+                v === undefined ||
+                v === null ||
+                ['unknown', 'unavailable', 'none', 'null', '']
+                  .includes(String(v).toLowerCase());
+
+              const aqiRaw = st('sensor.replace_outdoor_aqi');
+              const domRaw = st('sensor.replace_outdoor_dominant_pollutant');
+              const pm25Raw = st('sensor.replace_outdoor_pm25');
+              const pm10Raw = st('sensor.replace_outdoor_pm10');
+              const tempRaw = st('sensor.replace_outdoor_temperature');
+              const humRaw = st('sensor.replace_outdoor_humidity');
+
+              const aqi = bad(aqiRaw) ? '—' : Math.round(Number(aqiRaw));
+              const pm25 = bad(pm25Raw) ? '—' : Math.round(Number(pm25Raw));
+              const pm10 = bad(pm10Raw) ? '—' : Math.round(Number(pm10Raw));
+              const temp = bad(tempRaw) ? '—' : Number(tempRaw).toFixed(1);
+              const hum = bad(humRaw) ? '—' : Math.round(Number(humRaw));
+
+              const pollutantMap = {
+                pm25: 'PM2.5',
+                pm10: 'PM10',
+                o3: 'Ozone',
+                no2: 'NO₂',
+                so2: 'SO₂',
+                co: 'CO',
+                neph: 'NEPH'
+              };
+
+              const pollutant =
+                pollutantMap[domRaw] ||
+                String(domRaw || 'Unavailable').toUpperCase();
+
+              let category = 'Unavailable';
+
+              if (aqi !== '—') {
+                const n = Number(aqi);
+
+                if (n <= 50) category = 'Good';
+                else if (n <= 100) category = 'Moderate';
+                else if (n <= 150) category = 'Unhealthy for sensitive groups';
+                else if (n <= 200) category = 'Unhealthy';
+                else if (n <= 300) category = 'Very unhealthy';
+                else category = 'Hazardous';
+              }
+
+              const row = (label, value) => `
+                <div
+                  style="
+                    display:flex;
+                    justify-content:space-between;
+                    gap:8px;
+                    font-size:13px;
+                    line-height:1.2;
+                    margin-bottom:4px;
+                  "
+                >
+                  <span style="color:#444;">${label}</span>
+                  <strong style="text-align:right;">${value}</strong>
+                </div>
+              `;
+
+              return `
+                <div
+                  style="
+                    font-size:12px;
+                    font-weight:700;
+                    letter-spacing:0.08em;
+                    text-transform:uppercase;
+                    margin-bottom:8px;
+                    border-top:1px solid #111;
+                    padding-top:4px;
+                  "
+                >
+                  Outside air
+                </div>
+
+                <div
+                  style="
+                    display:flex;
+                    justify-content:space-between;
+                    align-items:flex-end;
+                    margin-bottom:8px;
+                  "
+                >
+                  <div style="font-size:28px;font-weight:700;line-height:1;">
+                    AQI ${aqi}
+                  </div>
+                  <div style="font-size:12px;color:#444;text-align:right;">
+                    ${category}
+                  </div>
+                </div>
+
+                ${row('Dominant', pollutant)}
+                ${row('PM2.5 / PM10', `${pm25} / ${pm10}`)}
+                ${row('Station', `${temp}° · ${hum}%`)}
+              `;
+            ]]]
+
+      # ==========================================================
+      # REFRESH FOOTER
+      # ==========================================================
+
+      - type: custom:button-card
+        template: trmnl_panel
+        view_layout:
+          grid-area: footer
+        update_timer: 1min
+        styles:
+          card:
+            - background: transparent
+            - box-shadow: none
+            - border: none
+            - border-radius: 0
+            - padding: 0 2px
+            - margin: 0
+            - height: 16px
+            - min-height: 16px
+            - overflow: hidden
+          custom_fields:
+            body:
+              - align-self: center
+              - justify-self: start
+              - text-align: left
+              - overflow: visible
+        custom_fields:
+          body: |
+            [[[
+              const d = new Date();
+              const timeZone = hass.config?.time_zone || undefined;
+
+              const dateText = d.toLocaleDateString('en-US', {
+                timeZone,
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric'
+              });
+
+              const timeText = d.toLocaleTimeString('en-US', {
+                timeZone,
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              });
+
+              return `
+                <div
+                  style="
+                    font-size:9px;
+                    line-height:12px;
+                    color:#555;
+                    text-align:left;
+                    white-space:nowrap;
+                  "
+                >
+                  Refreshed ${dateText} · ${timeText}
+                </div>
+              `;
+            ]]]
