@@ -98,7 +98,11 @@ Resources in this repository are intended to be understandable, reusable, and pr
 
 ## Issues and Contributions
 
-Bug reports, feature suggestions, compatibility notes, and improvements are welcome through GitHub issues and pull requests as the repository expands.
+This is a **Dominion-curated** repository. Community bug reports, feature suggestions, compatibility notes, documentation improvements, and pull requests that improve existing resources are welcome.
+
+Before contributing, please read [CONTRIBUTING.md](CONTRIBUTING.md). New standalone resource ideas should normally begin as a feature request so they can be reviewed for fit with the repository.
+
+For security-sensitive issues, do **not** publish exploit details, credentials, private URLs, or other sensitive information in a public issue. See [SECURITY.md](SECURITY.md) for reporting guidance.
 
 ## Branding
 
