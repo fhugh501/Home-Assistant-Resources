@@ -42,7 +42,9 @@ A community-designed two-part 3D-printable wall mount for the **TRMNL 7.5" OG DI
 
 #### Export Device & Entity States
 
-A reusable **script blueprint** that exports detailed Home Assistant state information for one or more devices and/or individual entities into a copyable persistent notification.
+**v1.0.0 release candidate** · **Script blueprint** · **Home Assistant 2024.8.0+**
+
+A reusable script blueprint that exports detailed Home Assistant state information for one or more devices and/or individual entities into a copyable persistent notification.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Ffhugh501%2FHome-Assistant-Resources%2Fmain%2Fblueprints%2Fscript%2Ffhugh501%2Fexport_device_entity_states.yaml)
 
@@ -57,7 +59,9 @@ A reusable **script blueprint** that exports detailed Home Assistant state infor
 - Produce a persistent notification formatted for easy copy/paste
 - No custom integration required
 
-[View full documentation](blueprints/script/fhugh501/README.md) · [View blueprint YAML](blueprints/script/fhugh501/export_device_entity_states.yaml)
+> **Privacy note:** the export intentionally includes all exposed attributes. Review and redact the output before sharing it publicly.
+
+[View full documentation](blueprints/script/fhugh501/README.md) · [View blueprint YAML](blueprints/script/fhugh501/export_device_entity_states.yaml) · [View changelog](blueprints/script/fhugh501/CHANGELOG.md)
 
 ## Repository Scope
 
