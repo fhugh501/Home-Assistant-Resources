@@ -1,0 +1,108 @@
+name: Bug report
+description: Report a reproducible problem with an existing Dominion Smart Home Systems resource
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Please provide enough detail to reproduce it.
+
+        **Do not include passwords, API keys, access tokens, alarm codes, private webhook URLs, or other sensitive information.**
+
+  - type: dropdown
+    id: resource_type
+    attributes:
+      label: Resource type
+      description: What kind of resource is affected?
+      options:
+        - Automation blueprint
+        - Script blueprint
+        - Dashboard
+        - ESPHome or device resource
+        - Custom integration or utility
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: resource
+    attributes:
+      label: Affected resource
+      description: Provide the resource name or repository path.
+      placeholder: blueprints/script/fhugh501/export_device_entity_states.yaml
+    validations:
+      required: true
+
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      description: Enter the Home Assistant version where you reproduced the issue.
+      placeholder: 2026.9.x
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the actual behavior and the problem you observed.
+      placeholder: Describe the issue clearly and specifically.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      description: Describe the expected behavior.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: List the smallest set of steps that reliably reproduces the issue.
+      placeholder: |
+        1. Install/import...
+        2. Configure...
+        3. Run/open...
+        4. Observe...
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Relevant integrations, custom cards, hardware, or dependencies
+      description: Include versions when they may matter. Write "None" if not applicable.
+      placeholder: Example: weather-radar-card vX.Y, ESPHome 2026.x, specific device model
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or error messages
+      description: Paste only the portions needed to understand the issue. Redact private data and credentials.
+      render: text
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Add screenshots, configuration excerpts, or other context that may help. Redact private information.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and did not find the same problem already reported.
+          required: true
+        - label: I removed passwords, tokens, private URLs, alarm/lock codes, and other sensitive information.
+          required: true
+        - label: I am reporting a problem with a resource maintained in this repository, not an unrelated third-party project.
+          required: true
