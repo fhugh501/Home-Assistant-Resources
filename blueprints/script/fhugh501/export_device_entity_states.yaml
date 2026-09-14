@@ -1,3 +1,9 @@
+# Dominion Smart Home Systems
+# Export Device & Entity States
+# Version: 1.0.0
+# Copyright (c) 2026 Dominion Technology Consulting
+# Licensed under the MIT License. See the repository LICENSE file.
+
 blueprint:
   name: Export Device & Entity States
   description: >-
@@ -6,9 +12,11 @@ blueprint:
     friendly names, current states, availability, common selectable options/modes,
     device/state classes, units, and all current attributes. Duplicate entities are
     automatically suppressed when they are selected directly and also belong to a
-    selected device.
+    selected device. No custom integration is required.
   domain: script
-  author: fhugh501
+  author: Dominion Smart Home Systems
+  homeassistant:
+    min_version: "2024.8.0"
   input:
     selected_devices:
       name: Devices
