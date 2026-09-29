@@ -94,11 +94,25 @@ You can also import manually in Home Assistant:
 
 Resources in this repository are intended to be understandable, reusable, and practical. Wherever possible, projects should:
 
+- Start with a real Home Assistant problem and reduce the effort required to solve it
 - Use native Home Assistant functionality before requiring custom dependencies
 - Avoid hard-coded entity IDs when selectors or configuration inputs can be used instead
-- Include clear installation and usage documentation
+- Include clear installation, usage, and troubleshooting documentation
 - Be designed for reuse outside the original installation
 - Clearly identify external integrations or hardware requirements
+- Keep the core public resource genuinely useful
+
+The broader project strategy is **usefulness first, sustainability second**: solve real problems, publish strong free resources, document compatible hardware clearly, and allow optional support or future convenience products to grow around projects that users actually value.
+
+[Read the full project and sustainability strategy](PROJECT_STRATEGY.md)
+
+## Support, Recommendations & Affiliate Disclosure
+
+Some project documentation may include recommended hardware, components, tools, or services that are useful for reproducing a build.
+
+Where affiliate links are used, they will be identified clearly. Recommendations should be based on project relevance, compatibility, or real-world use rather than commission.
+
+Optional donation or sponsorship links may also be added to support continued development. Core public resources will not require a donation to use.
 
 ## Issues and Contributions
 
