@@ -40,14 +40,15 @@ A community-designed two-part 3D-printable wall mount for the **TRMNL 7.5" OG DI
 
 #### Waveshare Front-Door Panel — In Development
 
-Display selection notes for a planned Home Assistant panel with
-a custom 3D-printed enclosure and optional approach detection.
+Display selection notes and a linked 3D-printable enclosure currently
+used to wall-mount the project owner’s Home Assistant panel.
+Optional approach detection is a future enhancement.
 
 [View hardware notes](hardware/waveshare-front-door-panel/README.md)
 (includes a clearly disclosed affiliate link).
 
-Firmware, installation instructions, and enclosure files are
-not yet included.
+The enclosure design is linked in the hardware notes. Firmware
+and installation instructions are not yet included.
 
 ### Blueprints
 
