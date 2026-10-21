@@ -1,10 +1,10 @@
 # Waveshare Front-Door Panel
 
-Hardware selection notes for Dominion Smart Home Systems’ planned
-Home Assistant panel documentation.
+Hardware selection and wall-mount notes for Dominion Smart Home Systems’
+existing Home Assistant panel.
 
-Status: In development. Firmware, installation instructions, and
-3D-printable enclosure files are not yet included.
+Status: Documentation in development. Enclosure design linked below;
+firmware and installation instructions are not yet included.
 
 ## Display
 
@@ -25,7 +25,19 @@ Check the final price, shipping, and taxes for your destination.
 New-shopper offers may not apply to everyone.
 
 The linked seller’s unit has not yet been tested for this project.
-Enclosure fit and firmware compatibility still need validation.
+Compatibility of the linked seller’s unit with the existing enclosure
+and firmware still needs validation.
+
+## 3D-printed enclosure
+
+[3D-printable wall enclosure on Thingiverse](https://www.thingiverse.com/thing:7414413)
+
+This design has been printed and is currently used to mount the
+project owner’s existing Waveshare panel to the wall. Check your
+board revision against the designer’s compatibility notes before printing.
+
+Clearance for the optional radar sensor remains unverified.
+Follow the creator’s print instructions and license.
 
 ## Optional approach detection
 
