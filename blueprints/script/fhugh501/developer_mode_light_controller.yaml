@@ -1,37 +1,147 @@
 # MIT License — Copyright (c) 2026 Dominion Technology Consulting
-# Version: 1.0.0-rc.1 — offline tested; live Home Assistant validation pending
+# Version: 1.1.0-rc.1 — transition sampling; hardware validation pending
 blueprint:
   name: Developer Mode Light Controller
-  description: Control one light with runtime fields and a refreshing persistent notification. Supports on, off,
-    toggle, status, color, brightness, transition, and optional timed shutoff. Reports Home Assistant state; completion
-    does not prove physical convergence.
+  description: Control a light and test its requested fade time. Choose settings below, run the saved script, and
+    watch the notification sample log. Requests a refresh before each sample and compares reported timing with the
+    request. Device feedback may be cached or optimistic; physical timing remains unverified. Version 1.1.0-rc.1.
   domain: script
   author: Dominion Smart Home Systems
   source_url: https://github.com/fhugh501/Home-Assistant-Resources/blob/main/blueprints/script/fhugh501/developer_mode_light_controller.yaml
   homeassistant:
     min_version: 2024.8.0
-  input: {}
+  input:
+    selected_light:
+      name: Light to test
+      description: Choose a light, or leave empty and provide light_entity when calling the script.
+      default: ''
+      selector:
+        entity:
+          filter:
+            domain: light
+    default_command:
+      name: Command
+      default: turn_on
+      selector:
+        select:
+          options:
+            - turn_on
+            - turn_off
+            - toggle
+            - status
+    set_brightness:
+      name: Set brightness
+      default: false
+      selector:
+        boolean: {}
+    target_brightness:
+      name: Target brightness
+      default: 80
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          unit_of_measurement: '%'
+          mode: box
+    color_setting:
+      name: Color setting
+      default: keep
+      selector:
+        select:
+          options:
+            - keep
+            - rgb
+            - color_temp
+    target_rgb:
+      name: Target RGB color
+      default:
+        - 0
+        - 86
+        - 214
+      selector:
+        color_rgb: {}
+    target_temperature:
+      name: Target color temperature
+      default: 3000
+      selector:
+        number:
+          min: 1000
+          max: 40000
+          step: 1
+          unit_of_measurement: K
+          mode: box
+    default_effect:
+      name: Effect (optional)
+      default: ''
+      selector:
+        text: {}
+    transition_seconds:
+      name: Requested transition time
+      default: 30
+      selector:
+        number:
+          min: 0
+          max: 3600
+          step: 1
+          unit_of_measurement: s
+          mode: box
+    poll_seconds:
+      name: Sample / poll interval
+      default: 2
+      selector:
+        number:
+          min: 1
+          max: 60
+          step: 1
+          unit_of_measurement: s
+          mode: box
+    settle_seconds:
+      name: Continue observing after requested transition
+      default: 5
+      selector:
+        number:
+          min: 0
+          max: 300
+          step: 1
+          unit_of_measurement: s
+          mode: box
+    poll_light:
+      name: Request light refresh before every sample
+      description: Calls homeassistant.update_entity. Some integrations ignore refreshes or return cached / optimistic
+        values. Refresh errors stop the test and remain visible in the trace.
+      default: true
+      selector:
+        boolean: {}
+    on_duration:
+      name: Optional on duration after transition test (0 disables timed shutoff)
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 86400
+          step: 1
+          unit_of_measurement: s
+          mode: box
 mode: single
 max_exceeded: warning
 fields:
   light_entity:
     name: Light
-    description: Select one light to control and monitor.
-    required: true
+    description: Optional override of the light selected in blueprint settings.
     selector:
       entity:
         filter:
           domain: light
   command:
     name: Command
-    default: turn_on
     selector:
       select:
         options:
-        - turn_on
-        - turn_off
-        - toggle
-        - status
+          - turn_on
+          - turn_off
+          - toggle
+          - status
   brightness_pct:
     name: Brightness (%)
     description: Optional. Omit to preserve brightness; zero requests off.
@@ -64,8 +174,7 @@ fields:
       text: {}
   transition:
     name: Transition (seconds)
-    description: Fade time, if supported by the device.
-    default: 0
+    description: Optional override of the configured transition time.
     selector:
       number:
         min: 0
@@ -77,7 +186,6 @@ fields:
     name: On duration (seconds)
     description: 0 leaves the light on. Otherwise, wait this long after transition monitoring, then turn off using
       the same transition.
-    default: 0
     selector:
       number:
         min: 0
@@ -87,7 +195,6 @@ fields:
         mode: box
   status_interval:
     name: Status refresh (seconds)
-    default: 2
     selector:
       number:
         min: 1
@@ -95,339 +202,354 @@ fields:
         step: 1
         unit_of_measurement: s
         mode: box
+    description: Optional override of the sample / poll interval.
+  settle_time:
+    name: Extra observation time (seconds)
+    selector:
+      number:
+        min: 0
+        max: 300
+        step: 1
+        unit_of_measurement: s
+        mode: box
+  poll:
+    name: Request refresh before each sample
+    selector:
+      boolean: {}
 sequence:
-- variables:
-    entity: '{{ light_entity | default('''') }}'
-    operation: '{{ command | default(''turn_on'') }}'
-    fade: '{{ transition | default(0) }}'
-    hold: '{{ duration | default(0) }}'
-    interval: '{{ status_interval | default(2) }}'
-    validation_error: |-
-      {% set ns = namespace(errors=[]) %}
-      {% if entity is not string or not entity.startswith('light.') %}
-        {% set ns.errors = ns.errors + ['Select a single light entity.'] %}
-      {% endif %}
-      {% if operation not in ['turn_on', 'turn_off', 'toggle', 'status'] %}
-        {% set ns.errors = ns.errors + ['Invalid command.'] %}
-      {% endif %}
-      {% for value, low, high, label in [(fade, 0, 3600, 'transition'), (hold, 0, 86400, 'duration'), (interval, 1, 60, 'status_interval')] %}
-        {% if value is not number or value is boolean or not (low <= value <= high) %}
-          {% set ns.errors = ns.errors + [label ~ ' is outside the allowed numeric range.'] %}
-        {% endif %}
-      {% endfor %}
-      {% if brightness_pct is defined and (brightness_pct is not number or brightness_pct is boolean or not (0 <= brightness_pct <= 100)) %}
-        {% set ns.errors = ns.errors + ['Brightness must be a number from 0 to 100.'] %}
-      {% endif %}
-      {% if rgb_color is defined %}
-        {% if rgb_color is not sequence or rgb_color is string or rgb_color is mapping or rgb_color | length != 3 %}
-          {% set ns.errors = ns.errors + ['RGB must contain three integers from 0 to 255.'] %}
-        {% else %}
-          {% for component in rgb_color %}
-            {% if component is not integer or component is boolean or not (0 <= component <= 255) %}
-              {% set ns.errors = ns.errors + ['RGB components must be integers from 0 to 255.'] %}
-            {% endif %}
-          {% endfor %}
-        {% endif %}
-      {% endif %}
-      {% if color_temp_kelvin is defined and (color_temp_kelvin is not number or color_temp_kelvin is boolean or not (1000 <= color_temp_kelvin <= 40000)) %}
-        {% set ns.errors = ns.errors + ['Color temperature must be a number from 1000 to 40000 K.'] %}
-      {% endif %}
-      {% if rgb_color is defined and color_temp_kelvin is defined %}
-        {% set ns.errors = ns.errors + ['Choose RGB or color temperature, not both.'] %}
-      {% endif %}
-      {% if effect is defined and effect is not string %}
-        {% set ns.errors = ns.errors + ['Effect must be a string.'] %}
-      {% endif %}
-      {{ ns.errors | join(' ') }}
-- if:
-  - condition: template
-    value_template: '{{ validation_error | trim != '''' }}'
-  then:
-  - action: persistent_notification.create
-    data:
-      title: Developer Mode Light Controller — invalid request
-      message: '{{ validation_error }}'
-  - stop: '{{ validation_error }}'
-    error: true
-- variables:
-    notification_key: '{{ ''dominion_light_control_'' ~ this.entity_id }}'
-    resolved: '{{ (''turn_off'' if states(entity) == ''on'' else ''turn_on'') if operation == ''toggle'' else operation
-      }}'
-- if:
-  - condition: template
-    value_template: '{{ operation != ''status'' and states(entity) not in [''on'', ''off''] }}'
-  then:
-  - action: persistent_notification.create
-    data:
-      notification_id: '{{ notification_key }}'
-      title: Developer Mode Light Controller — unavailable
-      message: '{{ entity }} reports {{ states(entity) }}. No light action was sent.'
-  - stop: Selected light is missing, unknown, or unavailable.
-    error: true
-- if:
-  - condition: template
-    value_template: '{{ operation != ''status'' }}'
-  then:
+  - alias: Load blueprint settings and optional runtime overrides
+    variables:
+      cfg_selected_light: !input 'selected_light'
+      cfg_default_command: !input 'default_command'
+      cfg_set_brightness: !input 'set_brightness'
+      cfg_target_brightness: !input 'target_brightness'
+      cfg_color_setting: !input 'color_setting'
+      cfg_target_rgb: !input 'target_rgb'
+      cfg_target_temperature: !input 'target_temperature'
+      cfg_default_effect: !input 'default_effect'
+      cfg_transition_seconds: !input 'transition_seconds'
+      cfg_poll_seconds: !input 'poll_seconds'
+      cfg_settle_seconds: !input 'settle_seconds'
+      cfg_poll_light: !input 'poll_light'
+      cfg_on_duration: !input 'on_duration'
   - variables:
-      service_data: |-
-        {% set ns = namespace(data=dict(transition=fade)) %}
-        {% if resolved == 'turn_on' %}
-          {% if brightness_pct is defined %}{% set ns.data = dict(ns.data, brightness_pct=brightness_pct) %}{% endif %}
-          {% if rgb_color is defined %}{% set ns.data = dict(ns.data, rgb_color=rgb_color) %}{% endif %}
-          {% if color_temp_kelvin is defined %}{% set ns.data = dict(ns.data, color_temp_kelvin=color_temp_kelvin) %}{% endif %}
-          {% if effect is defined and effect | length > 0 %}{% set ns.data = dict(ns.data, effect=effect) %}{% endif %}
+      entity: '{{ light_entity | default(cfg_selected_light) }}'
+      operation: '{{ command | default(cfg_default_command) }}'
+      fade: '{{ transition | default(cfg_transition_seconds) }}'
+      hold: '{{ duration | default(cfg_on_duration) }}'
+      interval: '{{ status_interval | default(cfg_poll_seconds) }}'
+      grace: '{{ settle_time | default(cfg_settle_seconds) }}'
+      force_poll: '{{ poll | default(cfg_poll_light) }}'
+      wanted_brightness: '{{ brightness_pct | default(cfg_target_brightness if cfg_set_brightness else none) }}'
+      wanted_rgb: '{{ rgb_color | default(cfg_target_rgb if cfg_color_setting == ''rgb'' and color_temp_kelvin is
+        not defined else none) }}'
+      wanted_temperature: '{{ color_temp_kelvin | default(cfg_target_temperature if cfg_color_setting == ''color_temp''
+        and rgb_color is not defined else none) }}'
+      wanted_effect: '{{ effect | default(cfg_default_effect) }}'
+      validation_error: |-
+        {% set ns = namespace(errors=[]) %}
+        {% if entity is not string or not entity.startswith('light.') %}{% set ns.errors = ns.errors + ['Choose a single light in blueprint settings or supply light_entity.'] %}{% endif %}
+        {% if operation not in ['turn_on', 'turn_off', 'toggle', 'status'] %}{% set ns.errors = ns.errors + ['Invalid command.'] %}{% endif %}
+        {% for value, low, high, label in [(fade,0,3600,'transition'),(hold,0,86400,'duration'),(interval,1,60,'status_interval'),(grace,0,300,'settle_time')] %}
+        {% if value is not number or value is boolean or not (low <= value <= high) %}{% set ns.errors = ns.errors + [label ~ ' is outside the allowed numeric range.'] %}{% endif %}
+        {% endfor %}
+        {% if force_poll is not boolean %}{% set ns.errors = ns.errors + ['poll must be a boolean.'] %}{% endif %}
+        {% if wanted_brightness is not none and (wanted_brightness is not number or wanted_brightness is boolean or not (0 <= wanted_brightness <= 100)) %}{% set ns.errors = ns.errors + ['Brightness must be a number from 0 to 100.'] %}{% endif %}
+        {% if wanted_rgb is not none %}
+        {% if wanted_rgb is not sequence or wanted_rgb is string or wanted_rgb is mapping or wanted_rgb | length != 3 %}{% set ns.errors = ns.errors + ['RGB must contain three integers from 0 to 255.'] %}
+        {% else %}{% for c in wanted_rgb %}{% if c is not integer or c is boolean or not (0 <= c <= 255) %}{% set ns.errors = ns.errors + ['RGB components must be integers from 0 to 255.'] %}{% endif %}{% endfor %}{% endif %}
         {% endif %}
-        {{ ns.data }}
-  - action: persistent_notification.create
-    data:
-      notification_id: '{{ notification_key }}'
-      title: Developer Mode Light Controller — {{ entity }}
-      message: |-
-        Phase: Sending request
-        Updated: {{ now().isoformat() }}
-        Command: {{ operation }}; resolved action: {{ resolved }}
-        Requested brightness: {{ brightness_pct | default('unchanged') }}%
-        Requested RGB: {{ rgb_color | default('unchanged') }}
-        Requested temperature: {{ color_temp_kelvin | default('unchanged') }} K
-        Requested effect: {{ effect | default('unchanged') }}
-        Transition: {{ fade }} s; on duration: {{ hold }} s
-        Reported state: {{ states(entity) }}
-        Reported brightness: {{ ((state_attr(entity, 'brightness') | float / 255 * 100) | round(1)) if state_attr(entity, 'brightness') is number else 'not reported' }}%
-        Reported RGB: {{ state_attr(entity, 'rgb_color') }}
-        Reported temperature: {{ state_attr(entity, 'color_temp_kelvin') }} K
-        Reported effect: {{ state_attr(entity, 'effect') }}
-        Reported color mode: {{ state_attr(entity, 'color_mode') }}
-        These are Home Assistant reports, not measured physical fade progress.
-        If the script stops before the final report, check its trace for errors.
-  - action: '{{ ''light.'' ~ resolved }}'
-    target:
-      entity_id: '{{ entity }}'
-    data: '{{ service_data }}'
-  - variables:
-      phase_started: '{{ as_timestamp(now()) }}'
-      phase_seconds: '{{ fade + 2 }}'
-  - action: persistent_notification.create
-    data:
-      notification_id: '{{ notification_key }}'
-      title: Developer Mode Light Controller — {{ entity }}
-      message: |-
-        Phase: Observing adjustment
-        Phase elapsed: {{ (as_timestamp(now()) - phase_started) | round(1) }} s; remaining: {{ [0, phase_seconds - (as_timestamp(now()) - phase_started)] | max | round(1) }} s (timer only)
-        Updated: {{ now().isoformat() }}
-        Command: {{ operation }}; resolved action: {{ resolved }}
-        Requested brightness: {{ brightness_pct | default('unchanged') }}%
-        Requested RGB: {{ rgb_color | default('unchanged') }}
-        Requested temperature: {{ color_temp_kelvin | default('unchanged') }} K
-        Requested effect: {{ effect | default('unchanged') }}
-        Transition: {{ fade }} s; on duration: {{ hold }} s
-        Reported state: {{ states(entity) }}
-        Reported brightness: {{ ((state_attr(entity, 'brightness') | float / 255 * 100) | round(1)) if state_attr(entity, 'brightness') is number else 'not reported' }}%
-        Reported RGB: {{ state_attr(entity, 'rgb_color') }}
-        Reported temperature: {{ state_attr(entity, 'color_temp_kelvin') }} K
-        Reported effect: {{ state_attr(entity, 'effect') }}
-        Reported color mode: {{ state_attr(entity, 'color_mode') }}
-        These are Home Assistant reports, not measured physical fade progress.
-        If the script stops before the final report, check its trace for errors.
-  - repeat:
-      while:
+        {% if wanted_temperature is not none and (wanted_temperature is not number or wanted_temperature is boolean or not (1000 <= wanted_temperature <= 40000)) %}{% set ns.errors = ns.errors + ['Temperature must be between 1000 and 40000 K.'] %}{% endif %}
+        {% if wanted_rgb is not none and wanted_temperature is not none %}{% set ns.errors = ns.errors + ['Choose RGB or color temperature, not both.'] %}{% endif %}
+        {% if wanted_effect is not string %}{% set ns.errors = ns.errors + ['Effect must be a string.'] %}{% endif %}
+        {{ ns.errors | join(' ') }}
+  - if:
       - condition: template
-        value_template: '{{ as_timestamp(now()) - phase_started < phase_seconds }}'
-      sequence:
-      - delay:
-          seconds: '{{ [interval, [0, phase_seconds - (as_timestamp(now()) - phase_started)] | max] | min }}'
+        value_template: '{{ validation_error | trim != '''' }}'
+    then:
+      - action: persistent_notification.create
+        data:
+          title: Light controller — invalid settings
+          message: '{{ validation_error }}'
+      - stop: '{{ validation_error }}'
+        error: true
+  - variables:
+      notification_key: '{{ ''dominion_light_control_'' ~ this.entity_id }}'
+      poll_requests: 0
+      reports: []
+      phase_started: '{{ as_timestamp(now()) }}'
+  - action: persistent_notification.create
+    data:
+      notification_id: '{{ notification_key }}'
+      title: Light transition test — preparing
+      message: Refreshing the selected light before the test. If this message remains, check the script trace for
+        a refresh error.
+  - if:
+      - condition: template
+        value_template: '{{ force_poll }}'
+    then:
+      - variables:
+          poll_requests: '{{ poll_requests + 1 }}'
+      - action: homeassistant.update_entity
+        target:
+          entity_id: '{{ entity }}'
+  - if:
+      - condition: template
+        value_template: '{{ operation != ''status'' and states(entity) not in [''on'',''off''] }}'
+    then:
       - action: persistent_notification.create
         data:
           notification_id: '{{ notification_key }}'
-          title: Developer Mode Light Controller — {{ entity }}
-          message: |-
-            Phase: Observing adjustment
-            Phase elapsed: {{ (as_timestamp(now()) - phase_started) | round(1) }} s; remaining: {{ [0, phase_seconds - (as_timestamp(now()) - phase_started)] | max | round(1) }} s (timer only)
-            Updated: {{ now().isoformat() }}
-            Command: {{ operation }}; resolved action: {{ resolved }}
-            Requested brightness: {{ brightness_pct | default('unchanged') }}%
-            Requested RGB: {{ rgb_color | default('unchanged') }}
-            Requested temperature: {{ color_temp_kelvin | default('unchanged') }} K
-            Requested effect: {{ effect | default('unchanged') }}
-            Transition: {{ fade }} s; on duration: {{ hold }} s
-            Reported state: {{ states(entity) }}
-            Reported brightness: {{ ((state_attr(entity, 'brightness') | float / 255 * 100) | round(1)) if state_attr(entity, 'brightness') is number else 'not reported' }}%
-            Reported RGB: {{ state_attr(entity, 'rgb_color') }}
-            Reported temperature: {{ state_attr(entity, 'color_temp_kelvin') }} K
-            Reported effect: {{ state_attr(entity, 'effect') }}
-            Reported color mode: {{ state_attr(entity, 'color_mode') }}
-            These are Home Assistant reports, not measured physical fade progress.
-            If the script stops before the final report, check its trace for errors.
-  - if:
-    - condition: template
-      value_template: '{{ resolved == ''turn_on'' and hold > 0 and (brightness_pct | default(100)) > 0 }}'
-    then:
-    - variables:
-        phase_started: '{{ as_timestamp(now()) }}'
-        phase_seconds: '{{ hold }}'
-    - action: persistent_notification.create
-      data:
-        notification_id: '{{ notification_key }}'
-        title: Developer Mode Light Controller — {{ entity }}
-        message: |-
-          Phase: Waiting for timed shutoff
-          Phase elapsed: {{ (as_timestamp(now()) - phase_started) | round(1) }} s; remaining: {{ [0, phase_seconds - (as_timestamp(now()) - phase_started)] | max | round(1) }} s (timer only)
-          Updated: {{ now().isoformat() }}
-          Command: {{ operation }}; resolved action: {{ resolved }}
-          Requested brightness: {{ brightness_pct | default('unchanged') }}%
-          Requested RGB: {{ rgb_color | default('unchanged') }}
-          Requested temperature: {{ color_temp_kelvin | default('unchanged') }} K
-          Requested effect: {{ effect | default('unchanged') }}
-          Transition: {{ fade }} s; on duration: {{ hold }} s
-          Reported state: {{ states(entity) }}
-          Reported brightness: {{ ((state_attr(entity, 'brightness') | float / 255 * 100) | round(1)) if state_attr(entity, 'brightness') is number else 'not reported' }}%
-          Reported RGB: {{ state_attr(entity, 'rgb_color') }}
-          Reported temperature: {{ state_attr(entity, 'color_temp_kelvin') }} K
-          Reported effect: {{ state_attr(entity, 'effect') }}
-          Reported color mode: {{ state_attr(entity, 'color_mode') }}
-          These are Home Assistant reports, not measured physical fade progress.
-          If the script stops before the final report, check its trace for errors.
-    - repeat:
-        while:
-        - condition: template
-          value_template: '{{ as_timestamp(now()) - phase_started < phase_seconds }}'
-        sequence:
-        - delay:
-            seconds: '{{ [interval, [0, phase_seconds - (as_timestamp(now()) - phase_started)] | max] | min }}'
+          title: Light controller — unavailable
+          message: '{{ entity }} reports {{ states(entity) }}. No light command sent.'
+      - stop: Light unavailable.
+        error: true
+  - variables:
+      resolved: '{{ (''turn_off'' if states(entity) == ''on'' else ''turn_on'') if operation == ''toggle'' else
+        operation }}'
+      advertised_transition: '{{ (state_attr(entity,''supported_features'') | int(0) // 32) % 2 == 1 }}'
+      phase_plan: |-
+        {% if operation == 'status' %}{{ [dict(name='Status', action='none', seconds=0)] }}
+        {% else %}
+        {% set phases = [dict(name='Transition test', action=resolved, seconds=fade + grace)] %}
+        {% if resolved == 'turn_on' and hold > 0 and (wanted_brightness is none or wanted_brightness > 0) %}
+        {% set phases = phases + [dict(name='On duration', action='none', seconds=hold), dict(name='Timed shutoff test',action='turn_off',seconds=fade + grace)] %}
+        {% endif %}{{ phases }}{% endif %}
+  - repeat:
+      for_each: '{{ phase_plan }}'
+      sequence:
+        - variables:
+            phase_name: '{{ repeat.item.name }}'
+            phase_action: '{{ repeat.item.action }}'
+            phase_seconds: '{{ repeat.item.seconds }}'
+            expected_state: '{{ ''off'' if phase_action == ''turn_off'' or (phase_action == ''turn_on'' and wanted_brightness
+              == 0) else (''on'' if phase_action == ''turn_on'' else states(entity)) }}'
+            phase_started: '{{ as_timestamp(now()) }}'
+            baseline: |-
+              {% set obj = states[entity] %}
+              {{ dict(entity_id=entity, state=states(entity), available=states(entity) in ['on','off'],
+                brightness_pct=((state_attr(entity,'brightness') | float(0) / 255 * 100) | round(2) if state_attr(entity,'brightness') is number else none),
+                rgb_color=state_attr(entity,'rgb_color'), color_temp_kelvin=state_attr(entity,'color_temp_kelvin'),
+                xy_color=state_attr(entity,'xy_color'), color_mode=state_attr(entity,'color_mode'), effect=state_attr(entity,'effect'),
+                last_updated=(obj.last_updated.isoformat() if obj is defined else none),
+                last_reported=(obj.last_reported.isoformat() if obj is defined and obj.last_reported is defined else none),
+                observed_at=now().isoformat(), elapsed=(as_timestamp(now()) - phase_started) | round(3)) }}
+            baseline_signature: '{{ [baseline.state, baseline.brightness_pct if baseline.state == ''on'' else 0,
+              baseline.rgb_color if wanted_rgb is not none else none, baseline.color_temp_kelvin if wanted_temperature
+              is not none else none, baseline.effect if wanted_effect | length else none] }}'
+            baseline_matches: |-
+              {% set o = baseline %}
+              {% set ns = namespace(ok=o.state == expected_state) %}
+              {% if expected_state == 'on' %}
+                {% if wanted_brightness is not none and (o.brightness_pct is not number or (o.brightness_pct - wanted_brightness) | abs > 2) %}{% set ns.ok = false %}{% endif %}
+                {% if wanted_temperature is not none and (o.color_temp_kelvin is not number or (o.color_temp_kelvin - wanted_temperature) | abs > 100) %}{% set ns.ok = false %}{% endif %}
+                {% if wanted_rgb is not none %}
+                  {% if o.rgb_color is not sequence or o.rgb_color | length != 3 %}{% set ns.ok = false %}
+                  {% else %}
+                    {% set requested_max = [1, wanted_rgb | max] | max %}
+                    {% set reported_max = [1, o.rgb_color | max] | max %}
+                    {% for i in range(3) %}
+                      {% if (wanted_rgb[i] / requested_max * 255 - o.rgb_color[i] / reported_max * 255) | abs > 12 %}{% set ns.ok = false %}{% endif %}
+                    {% endfor %}
+                  {% endif %}
+                {% endif %}
+                {% if wanted_effect | length > 0 and o.effect != wanted_effect %}{% set ns.ok = false %}{% endif %}
+              {% endif %}
+              {{ ns.ok }}
+            current: '{{ baseline }}'
+            matches_target: '{{ baseline_matches }}'
+            assessment: ''
+            samples: []
+            sample_count: 0
+            poll_requests: 0
+            first_target_at: null
+            last_nonmatch_at: null
+            intermediate_samples: 0
+            unavailable_samples: 0
+            phase_finished: false
+            service_data: |-
+              {% set ns = namespace(data=dict(transition=fade)) %}
+              {% if phase_action == 'turn_on' %}
+              {% if wanted_brightness is not none %}{% set ns.data = dict(ns.data,brightness_pct=wanted_brightness) %}{% endif %}
+              {% if wanted_rgb is not none %}{% set ns.data = dict(ns.data,rgb_color=wanted_rgb) %}{% endif %}
+              {% if wanted_temperature is not none %}{% set ns.data = dict(ns.data,color_temp_kelvin=wanted_temperature) %}{% endif %}
+              {% if wanted_effect | length %}{% set ns.data = dict(ns.data,effect=wanted_effect) %}{% endif %}
+              {% endif %}{{ ns.data }}
         - action: persistent_notification.create
           data:
             notification_id: '{{ notification_key }}'
-            title: Developer Mode Light Controller — {{ entity }}
-            message: |-
-              Phase: Waiting for timed shutoff
-              Phase elapsed: {{ (as_timestamp(now()) - phase_started) | round(1) }} s; remaining: {{ [0, phase_seconds - (as_timestamp(now()) - phase_started)] | max | round(1) }} s (timer only)
-              Updated: {{ now().isoformat() }}
-              Command: {{ operation }}; resolved action: {{ resolved }}
-              Requested brightness: {{ brightness_pct | default('unchanged') }}%
-              Requested RGB: {{ rgb_color | default('unchanged') }}
-              Requested temperature: {{ color_temp_kelvin | default('unchanged') }} K
-              Requested effect: {{ effect | default('unchanged') }}
-              Transition: {{ fade }} s; on duration: {{ hold }} s
-              Reported state: {{ states(entity) }}
-              Reported brightness: {{ ((state_attr(entity, 'brightness') | float / 255 * 100) | round(1)) if state_attr(entity, 'brightness') is number else 'not reported' }}%
-              Reported RGB: {{ state_attr(entity, 'rgb_color') }}
-              Reported temperature: {{ state_attr(entity, 'color_temp_kelvin') }} K
-              Reported effect: {{ state_attr(entity, 'effect') }}
-              Reported color mode: {{ state_attr(entity, 'color_mode') }}
-              These are Home Assistant reports, not measured physical fade progress.
-              If the script stops before the final report, check its trace for errors.
-    - action: persistent_notification.create
-      data:
-        notification_id: '{{ notification_key }}'
-        title: Developer Mode Light Controller — {{ entity }}
-        message: |-
-          Phase: Sending timed shutoff
-          Updated: {{ now().isoformat() }}
-          Command: {{ operation }}; resolved action: {{ resolved }}
-          Requested brightness: {{ brightness_pct | default('unchanged') }}%
-          Requested RGB: {{ rgb_color | default('unchanged') }}
-          Requested temperature: {{ color_temp_kelvin | default('unchanged') }} K
-          Requested effect: {{ effect | default('unchanged') }}
-          Transition: {{ fade }} s; on duration: {{ hold }} s
-          Reported state: {{ states(entity) }}
-          Reported brightness: {{ ((state_attr(entity, 'brightness') | float / 255 * 100) | round(1)) if state_attr(entity, 'brightness') is number else 'not reported' }}%
-          Reported RGB: {{ state_attr(entity, 'rgb_color') }}
-          Reported temperature: {{ state_attr(entity, 'color_temp_kelvin') }} K
-          Reported effect: {{ state_attr(entity, 'effect') }}
-          Reported color mode: {{ state_attr(entity, 'color_mode') }}
-          These are Home Assistant reports, not measured physical fade progress.
-          If the script stops before the final report, check its trace for errors.
-    - action: light.turn_off
-      target:
-        entity_id: '{{ entity }}'
-      data:
-        transition: '{{ fade }}'
-    - variables:
-        phase_started: '{{ as_timestamp(now()) }}'
-        phase_seconds: '{{ fade + 2 }}'
-    - action: persistent_notification.create
-      data:
-        notification_id: '{{ notification_key }}'
-        title: Developer Mode Light Controller — {{ entity }}
-        message: |-
-          Phase: Observing timed shutoff
-          Phase elapsed: {{ (as_timestamp(now()) - phase_started) | round(1) }} s; remaining: {{ [0, phase_seconds - (as_timestamp(now()) - phase_started)] | max | round(1) }} s (timer only)
-          Updated: {{ now().isoformat() }}
-          Command: {{ operation }}; resolved action: {{ resolved }}
-          Requested brightness: {{ brightness_pct | default('unchanged') }}%
-          Requested RGB: {{ rgb_color | default('unchanged') }}
-          Requested temperature: {{ color_temp_kelvin | default('unchanged') }} K
-          Requested effect: {{ effect | default('unchanged') }}
-          Transition: {{ fade }} s; on duration: {{ hold }} s
-          Reported state: {{ states(entity) }}
-          Reported brightness: {{ ((state_attr(entity, 'brightness') | float / 255 * 100) | round(1)) if state_attr(entity, 'brightness') is number else 'not reported' }}%
-          Reported RGB: {{ state_attr(entity, 'rgb_color') }}
-          Reported temperature: {{ state_attr(entity, 'color_temp_kelvin') }} K
-          Reported effect: {{ state_attr(entity, 'effect') }}
-          Reported color mode: {{ state_attr(entity, 'color_mode') }}
-          These are Home Assistant reports, not measured physical fade progress.
-          If the script stops before the final report, check its trace for errors.
-    - repeat:
-        while:
-        - condition: template
-          value_template: '{{ as_timestamp(now()) - phase_started < phase_seconds }}'
-        sequence:
-        - delay:
-            seconds: '{{ [interval, [0, phase_seconds - (as_timestamp(now()) - phase_started)] | max] | min }}'
+            title: Light transition test — {{ entity }}
+            message: Starting {{ phase_name }}. Sending {{ phase_action }} with {{ service_data }}. If this message
+              remains, inspect the script trace.
+        - alias: Start the measurement clock before dispatching the light command
+          variables:
+            phase_started: '{{ as_timestamp(now()) }}'
+        - if:
+            - condition: template
+              value_template: '{{ phase_action == ''turn_on'' }}'
+          then:
+            - action: light.turn_on
+              target:
+                entity_id: '{{ entity }}'
+              data: '{{ service_data }}'
+        - if:
+            - condition: template
+              value_template: '{{ phase_action == ''turn_off'' }}'
+          then:
+            - action: light.turn_off
+              target:
+                entity_id: '{{ entity }}'
+              data:
+                transition: '{{ fade }}'
+        - alias: Sample immediately, then poll until the full observation window has elapsed
+          repeat:
+            sequence:
+              - if:
+                  - condition: template
+                    value_template: '{{ sample_count > 0 }}'
+                then:
+                  - delay:
+                      seconds: '{{ [interval, [0, phase_seconds - (as_timestamp(now()) - phase_started)] | max]
+                        | min }}'
+              - if:
+                  - condition: template
+                    value_template: '{{ force_poll }}'
+                then:
+                  - variables:
+                      poll_requests: '{{ poll_requests + 1 }}'
+                  - action: homeassistant.update_entity
+                    target:
+                      entity_id: '{{ entity }}'
+              - variables:
+                  current: |-
+                    {% set obj = states[entity] %}
+                    {{ dict(entity_id=entity, state=states(entity), available=states(entity) in ['on','off'],
+                      brightness_pct=((state_attr(entity,'brightness') | float(0) / 255 * 100) | round(2) if state_attr(entity,'brightness') is number else none),
+                      rgb_color=state_attr(entity,'rgb_color'), color_temp_kelvin=state_attr(entity,'color_temp_kelvin'),
+                      xy_color=state_attr(entity,'xy_color'), color_mode=state_attr(entity,'color_mode'), effect=state_attr(entity,'effect'),
+                      last_updated=(obj.last_updated.isoformat() if obj is defined else none),
+                      last_reported=(obj.last_reported.isoformat() if obj is defined and obj.last_reported is defined else none),
+                      observed_at=now().isoformat(), elapsed=(as_timestamp(now()) - phase_started) | round(3)) }}
+                  matches_target: |-
+                    {% set o = current %}
+                    {% set ns = namespace(ok=o.state == expected_state) %}
+                    {% if expected_state == 'on' %}
+                      {% if wanted_brightness is not none and (o.brightness_pct is not number or (o.brightness_pct - wanted_brightness) | abs > 2) %}{% set ns.ok = false %}{% endif %}
+                      {% if wanted_temperature is not none and (o.color_temp_kelvin is not number or (o.color_temp_kelvin - wanted_temperature) | abs > 100) %}{% set ns.ok = false %}{% endif %}
+                      {% if wanted_rgb is not none %}
+                        {% if o.rgb_color is not sequence or o.rgb_color | length != 3 %}{% set ns.ok = false %}
+                        {% else %}
+                          {% set requested_max = [1, wanted_rgb | max] | max %}
+                          {% set reported_max = [1, o.rgb_color | max] | max %}
+                          {% for i in range(3) %}
+                            {% if (wanted_rgb[i] / requested_max * 255 - o.rgb_color[i] / reported_max * 255) | abs > 12 %}{% set ns.ok = false %}{% endif %}
+                          {% endfor %}
+                        {% endif %}
+                      {% endif %}
+                      {% if wanted_effect | length > 0 and o.effect != wanted_effect %}{% set ns.ok = false %}{% endif %}
+                    {% endif %}
+                    {{ ns.ok }}
+                  signature: '{{ [current.state, current.brightness_pct if current.state == ''on'' else 0, current.rgb_color
+                    if wanted_rgb is not none else none, current.color_temp_kelvin if wanted_temperature is not
+                    none else none, current.effect if wanted_effect | length else none] }}'
+                  intermediate_samples: '{{ intermediate_samples + (1 if current.available and not matches_target
+                    and signature != baseline_signature else 0) }}'
+                  unavailable_samples: '{{ unavailable_samples + (0 if current.available else 1) }}'
+                  last_nonmatch_at: '{{ current.elapsed if not matches_target and first_target_at is none else last_nonmatch_at
+                    }}'
+                  first_target_at: '{{ current.elapsed if matches_target and first_target_at is none else first_target_at
+                    }}'
+                  sample_count: '{{ sample_count + 1 }}'
+                  samples: '{{ (samples + [dict(current, matches_target=matches_target)])[-120:] }}'
+                  assessment: |-
+                    {% if phase_action == 'none' %}Status / hold observation only.
+                    {% elif baseline_matches %}Already at requested values before command; transition timing inconclusive.
+                    {% elif unavailable_samples > 0 %}Unavailable samples observed; transition timing inconclusive.
+                    {% elif first_target_at is none %}Requested target was not reported during observation.
+                    {% elif not matches_target %}Target was reported but not sustained at the final sample.
+                    {% elif fade == 0 %}Target reported; no timed transition requested.
+                    {% elif first_target_at <= interval and fade > interval %}Target reported immediately; physical transition unverified (optimistic or fast response).
+                    {% elif intermediate_samples == 0 %}No intermediate values reported; physical transition timing inconclusive.
+                    {% elif (first_target_at - fade) | abs <= [interval,2] | max %}Intermediate values and target timing are compatible with the requested transition in HA reports; physical timing unverified.
+                    {% elif first_target_at < fade %}Target first reported earlier than requested; inspect samples and observe the light.
+                    {% else %}Target first reported later than requested; inspect samples and polling latency.
+                    {% endif %}
+              - action: persistent_notification.create
+                data:
+                  notification_id: '{{ notification_key }}'
+                  title: Light transition test — {{ entity }}
+                  message: |-
+                    **{{ phase_name }} — {{ 'finished' if phase_finished else 'running' }}**
+                    Requested transition: {{ fade }} s; elapsed: {{ current.elapsed }} s; observation window: {{ phase_seconds }} s
+                    Target: {{ expected_state }}; brightness {{ wanted_brightness }}%; RGB {{ wanted_rgb }}; temperature {{ wanted_temperature }} K; effect {{ wanted_effect or 'unchanged' }}
+                    Reported: {{ current.state }}, brightness {{ current.brightness_pct }}%, RGB {{ current.rgb_color }}, {{ current.color_temp_kelvin }} K
+                    Transition support advertised: {{ advertised_transition }}
+                    Refresh requested: {{ force_poll }}; refresh requests this phase: {{ poll_requests }}
+                    Last HA value change: {{ current.last_updated }}
+                    Last HA report: {{ current.last_reported }} (neither timestamp proves a physical device read)
+                    First target match: {{ first_target_at if first_target_at is not none else 'not observed' }} s
+                    Last nonmatching sample before first match: {{ last_nonmatch_at }} s
+                    Intermediate samples: {{ intermediate_samples }}; unavailable samples: {{ unavailable_samples }}
+                    Assessment: {{ assessment }}
+
+                    Recent samples (last 12 of {{ sample_count }}; {{ samples | length }} retained in response):
+                    | elapsed s | state | brightness % | RGB | K | target match |
+                    | --- | --- | --- | --- | --- | --- |
+                    {% for s in samples[-12:] %}| {{ s.elapsed }} | {{ s.state }} | {{ s.brightness_pct }} | {{ s.rgb_color }} | {{ s.color_temp_kelvin }} | {{ s.matches_target }} |
+                    {% endfor %}
+                    HA may report target values immediately. Refresh requests can return cached values or have no effect. This tool cannot certify physical fade timing. If updates stop before a finished report, check the script trace.
+            until:
+              - condition: template
+                value_template: '{{ as_timestamp(now()) - phase_started >= phase_seconds }}'
+        - variables:
+            phase_finished: true
+            phase_report: '{{ dict(phase=phase_name, action=phase_action, requested_transition=fade, baseline=baseline,
+              final=current, first_target_at=first_target_at, last_nonmatch_at=last_nonmatch_at, intermediate_samples=intermediate_samples,
+              unavailable_samples=unavailable_samples, sample_count=sample_count, poll_requests=poll_requests, samples=samples,
+              samples_truncated=sample_count > samples | length, assessment=assessment) }}'
+            reports: '{{ reports + [phase_report] }}'
         - action: persistent_notification.create
           data:
             notification_id: '{{ notification_key }}'
-            title: Developer Mode Light Controller — {{ entity }}
+            title: Light transition test — {{ entity }}
             message: |-
-              Phase: Observing timed shutoff
-              Phase elapsed: {{ (as_timestamp(now()) - phase_started) | round(1) }} s; remaining: {{ [0, phase_seconds - (as_timestamp(now()) - phase_started)] | max | round(1) }} s (timer only)
-              Updated: {{ now().isoformat() }}
-              Command: {{ operation }}; resolved action: {{ resolved }}
-              Requested brightness: {{ brightness_pct | default('unchanged') }}%
-              Requested RGB: {{ rgb_color | default('unchanged') }}
-              Requested temperature: {{ color_temp_kelvin | default('unchanged') }} K
-              Requested effect: {{ effect | default('unchanged') }}
-              Transition: {{ fade }} s; on duration: {{ hold }} s
-              Reported state: {{ states(entity) }}
-              Reported brightness: {{ ((state_attr(entity, 'brightness') | float / 255 * 100) | round(1)) if state_attr(entity, 'brightness') is number else 'not reported' }}%
-              Reported RGB: {{ state_attr(entity, 'rgb_color') }}
-              Reported temperature: {{ state_attr(entity, 'color_temp_kelvin') }} K
-              Reported effect: {{ state_attr(entity, 'effect') }}
-              Reported color mode: {{ state_attr(entity, 'color_mode') }}
-              These are Home Assistant reports, not measured physical fade progress.
-              If the script stops before the final report, check its trace for errors.
-- variables:
-    result: |-
-      {{ dict(entity_id=entity, state=states(entity),
-        available=states(entity) in ['on', 'off'],
-        brightness_pct=((state_attr(entity, 'brightness') | float / 255 * 100) | round(1)
-          if state_attr(entity, 'brightness') is number else none),
-        rgb_color=state_attr(entity, 'rgb_color'),
-        color_temp_kelvin=state_attr(entity, 'color_temp_kelvin'),
-        color_mode=state_attr(entity, 'color_mode'),
-        effect=state_attr(entity, 'effect'),
-        supported_color_modes=state_attr(entity, 'supported_color_modes'),
-        effect_list=state_attr(entity, 'effect_list'),
-        observed_at=now().isoformat()) }}
-- action: persistent_notification.create
-  data:
-    notification_id: '{{ notification_key }}'
-    title: Developer Mode Light Controller — {{ entity }}
-    message: |-
-      Phase: Final report — observation window ended; inspect reported values
-      Updated: {{ now().isoformat() }}
-      Command: {{ operation }}; resolved action: {{ resolved }}
-      Requested brightness: {{ brightness_pct | default('unchanged') }}%
-      Requested RGB: {{ rgb_color | default('unchanged') }}
-      Requested temperature: {{ color_temp_kelvin | default('unchanged') }} K
-      Requested effect: {{ effect | default('unchanged') }}
-      Transition: {{ fade }} s; on duration: {{ hold }} s
-      Reported state: {{ states(entity) }}
-      Reported brightness: {{ ((state_attr(entity, 'brightness') | float / 255 * 100) | round(1)) if state_attr(entity, 'brightness') is number else 'not reported' }}%
-      Reported RGB: {{ state_attr(entity, 'rgb_color') }}
-      Reported temperature: {{ state_attr(entity, 'color_temp_kelvin') }} K
-      Reported effect: {{ state_attr(entity, 'effect') }}
-      Reported color mode: {{ state_attr(entity, 'color_mode') }}
-      These are Home Assistant reports, not measured physical fade progress.
-      If the script stops before the final report, check its trace for errors.
-- stop: Returning reported light status.
-  response_variable: result
+              **{{ phase_name }} — {{ 'finished' if phase_finished else 'running' }}**
+              Requested transition: {{ fade }} s; elapsed: {{ current.elapsed }} s; observation window: {{ phase_seconds }} s
+              Target: {{ expected_state }}; brightness {{ wanted_brightness }}%; RGB {{ wanted_rgb }}; temperature {{ wanted_temperature }} K; effect {{ wanted_effect or 'unchanged' }}
+              Reported: {{ current.state }}, brightness {{ current.brightness_pct }}%, RGB {{ current.rgb_color }}, {{ current.color_temp_kelvin }} K
+              Transition support advertised: {{ advertised_transition }}
+              Refresh requested: {{ force_poll }}; refresh requests this phase: {{ poll_requests }}
+              Last HA value change: {{ current.last_updated }}
+              Last HA report: {{ current.last_reported }} (neither timestamp proves a physical device read)
+              First target match: {{ first_target_at if first_target_at is not none else 'not observed' }} s
+              Last nonmatching sample before first match: {{ last_nonmatch_at }} s
+              Intermediate samples: {{ intermediate_samples }}; unavailable samples: {{ unavailable_samples }}
+              Assessment: {{ assessment }}
+
+              Recent samples (last 12 of {{ sample_count }}; {{ samples | length }} retained in response):
+              | elapsed s | state | brightness % | RGB | K | target match |
+              | --- | --- | --- | --- | --- | --- |
+              {% for s in samples[-12:] %}| {{ s.elapsed }} | {{ s.state }} | {{ s.brightness_pct }} | {{ s.rgb_color }} | {{ s.color_temp_kelvin }} | {{ s.matches_target }} |
+              {% endfor %}
+              HA may report target values immediately. Refresh requests can return cached values or have no effect. This tool cannot certify physical fade timing. If updates stop before a finished report, check the script trace.
+  - variables:
+      result: '{{ dict(entity_id=entity, state=states(entity), available=states(entity) in [''on'',''off''], advertised_transition=advertised_transition,
+        refresh_requested=force_poll, reports=reports, physical_timing_verified=false) }}'
+  - action: persistent_notification.create
+    data:
+      notification_id: '{{ notification_key }}'
+      title: Light transition test — finished
+      message: |-
+        Transition support advertised: {{ advertised_transition }}. Refresh requests enabled: {{ force_poll }}.
+        {% for report in reports %}**{{ report.phase }}**
+        {{ report.assessment }}
+        Baseline: {{ report.baseline.state }}, {{ report.baseline.brightness_pct }}%; final: {{ report.final.state }}, {{ report.final.brightness_pct }}%.
+        Requested: {{ report.requested_transition }} s. First target report: {{ report.first_target_at }} s. Last preceding nonmatch: {{ report.last_nonmatch_at }} s. Intermediate samples: {{ report.intermediate_samples }}. Samples: {{ report.sample_count }}.
+        Recent samples:
+        | elapsed s | state | brightness % | RGB | K | target match |
+        | --- | --- | --- | --- | --- | --- |
+        {% for s in report.samples[-12:] %}| {{ s.elapsed }} | {{ s.state }} | {{ s.brightness_pct }} | {{ s.rgb_color }} | {{ s.color_temp_kelvin }} | {{ s.matches_target }} |
+        {% endfor %}{% endfor %}
+        Refresh requests may return cached / optimistic values or have no effect. Physical fade timing is unverified.
+  - stop: Returning sampled transition observations; physical timing is unverified.
+    response_variable: result
