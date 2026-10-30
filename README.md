@@ -52,6 +52,19 @@ and installation instructions are not yet included.
 
 ### Blueprints
 
+#### Developer Mode Light Controller
+
+**v1.0.0-rc.1** · **Script blueprint** · **Offline tested; live validation pending**
+
+Control a light with runtime fields for on/off/toggle, brightness, RGB color,
+color temperature, effects, transition time, and optional timed shutoff. A single
+persistent notification refreshes with Home Assistant's reported light values
+while observing adjustments. Includes a read-only status command and final response data.
+
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Ffhugh501%2FHome-Assistant-Resources%2Fmain%2Fblueprints%2Fscript%2Ffhugh501%2Fdeveloper_mode_light_controller.yaml)
+
+[Documentation and examples](blueprints/script/fhugh501/light-control/README.md) · [Blueprint YAML](blueprints/script/fhugh501/developer_mode_light_controller.yaml)
+
 #### Export Device & Entity States
 
 **v1.0.0 release candidate** · **Script blueprint** · **Home Assistant 2024.8.0+**
