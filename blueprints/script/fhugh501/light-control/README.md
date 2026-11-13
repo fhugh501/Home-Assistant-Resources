@@ -1,4 +1,6 @@
-# Developer Mode Light Controller
+# Developer Mode Light Controller (Experimental)
+
+> **Experimental.** The project owner has not physically tested this blueprint. Full Home Assistant script/frontend and physical fade validation remain pending; do not treat it as a stable release.
 
 Control a light and observe how its reported values change during a requested
 transition. Version **1.1.0-rc.1** adds visible blueprint settings, refresh requests,
@@ -7,12 +9,12 @@ No custom integration or helpers are required.
 
 ## Install or update
 
-[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Ffhugh501%2FHome-Assistant-Resources%2Fmain%2Fblueprints%2Fscript%2Ffhugh501%2Fdeveloper_mode_light_controller.yaml)
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Ffhugh501%2FHome-Assistant-Resources%2Fmain%2Fblueprints%2Fscript%2Ffhugh501%2Flight-control%2Fdeveloper_mode_light_controller.yaml)
 
 Paste this URL into **Import a blueprint**, or use the button:
 
 ```text
-https://raw.githubusercontent.com/fhugh501/Home-Assistant-Resources/main/blueprints/script/fhugh501/developer_mode_light_controller.yaml
+https://raw.githubusercontent.com/fhugh501/Home-Assistant-Resources/main/blueprints/script/fhugh501/light-control/developer_mode_light_controller.yaml
 ```
 
 For an existing installation, re-import the blueprint from its source to update
@@ -197,3 +199,7 @@ minimum HA version 2024.8.0 has not been live-tested.
 References: Home Assistant [light features and color conversion](https://contributors.home-assistant.io/core/entities/light/),
 [refresh requests and limitations](https://www.home-assistant.io/actions/homeassistant.update_entity/),
 and [script fields/responses](https://www.home-assistant.io/docs/script/).
+
+## File location
+
+The blueprint now lives alongside this README in `light-control/`. Use the updated import link above. The previous raw YAML URL no longer exists; existing Home Assistant copies are not automatically moved or updated. The separate Device & Entity States exporter is unchanged.

@@ -11,7 +11,7 @@ from jinja2 import StrictUndefined
 from jinja2.nativetypes import NativeEnvironment
 from jinja2.sandbox import SandboxedEnvironment
 
-BLUEPRINT = Path(__file__).resolve().parents[1] / 'blueprints/script/fhugh501/developer_mode_light_controller.yaml'
+BLUEPRINT = Path(__file__).resolve().parents[1] / 'blueprints/script/fhugh501/light-control/developer_mode_light_controller.yaml'
 
 class Input(str): pass
 class Loader(yaml.SafeLoader): pass

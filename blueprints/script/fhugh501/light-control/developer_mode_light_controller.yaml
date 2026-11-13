@@ -1,13 +1,13 @@
 # MIT License — Copyright (c) 2026 Dominion Technology Consulting
 # Version: 1.1.0-rc.1 — transition sampling; hardware validation pending
 blueprint:
-  name: Developer Mode Light Controller
-  description: Control a light and test its requested fade time. Choose settings below, run the saved script, and
+  name: Developer Mode Light Controller (Experimental)
+  description: 'EXPERIMENTAL: Not physically tested by the project owner. Full Home Assistant script/frontend validation remains pending. Control a light and test its requested fade time. Choose settings below, run the saved script, and
     watch the notification sample log. Requests a refresh before each sample and compares reported timing with the
-    request. Device feedback may be cached or optimistic; physical timing remains unverified. Version 1.1.0-rc.1.
+    request. Device feedback may be cached or optimistic; physical timing remains unverified. Version 1.1.0-rc.1.'
   domain: script
   author: Dominion Smart Home Systems
-  source_url: https://github.com/fhugh501/Home-Assistant-Resources/blob/main/blueprints/script/fhugh501/developer_mode_light_controller.yaml
+  source_url: https://github.com/fhugh501/Home-Assistant-Resources/blob/main/blueprints/script/fhugh501/light-control/developer_mode_light_controller.yaml
   homeassistant:
     min_version: 2024.8.0
   input:

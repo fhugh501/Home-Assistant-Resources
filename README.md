@@ -52,9 +52,9 @@ and installation instructions are not yet included.
 
 ### Blueprints
 
-#### Developer Mode Light Controller
+#### Developer Mode Light Controller (Experimental)
 
-**v1.1.0-rc.1** · **Script blueprint** · **Physical fade validation pending**
+**v1.1.0-rc.1** · **Script blueprint** · **Not physically tested; full script/frontend validation pending**
 
 Control a light and test its requested transition time using visible blueprint
 settings, optional runtime overrides, and refresh requests before samples. A
@@ -63,9 +63,9 @@ requested versus reported timing. Offline tests pass; sampling/comparison
 templates have also been evaluated read-only in a live Home Assistant engine.
 Device feedback may be cached or optimistic, so physical fade timing remains unverified.
 
-[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Ffhugh501%2FHome-Assistant-Resources%2Fmain%2Fblueprints%2Fscript%2Ffhugh501%2Fdeveloper_mode_light_controller.yaml)
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Ffhugh501%2FHome-Assistant-Resources%2Fmain%2Fblueprints%2Fscript%2Ffhugh501%2Flight-control%2Fdeveloper_mode_light_controller.yaml)
 
-[Documentation and examples](blueprints/script/fhugh501/light-control/README.md) · [Blueprint YAML](blueprints/script/fhugh501/developer_mode_light_controller.yaml)
+[Documentation and examples](blueprints/script/fhugh501/light-control/README.md) · [Blueprint YAML](blueprints/script/fhugh501/light-control/developer_mode_light_controller.yaml)
 
 #### Export Device & Entity States
 
